@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+// Session Shopify (géré par Shopify App)
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+// Configuration globale par boutique
+model AppSettings {
+  id                    String   @id @default(cuid())
+  shop                  String   @unique
+
+  // Pricing par défaut
+  defaultPricingMode    String   @default("markup") // "markup" | "multiplier"
+  defaultMarkupAmount   Float    @default(0)
+  defaultMultiplier     Float    @default(1.0)
+
+  // Synchronisation
+  autoSyncEnabled       Boolean  @default(false)
+  syncFrequency         String?  // "daily" | "weekly" | null
+
+  // Magasins sources autorisés (JSON array de domains)
+  authorizedSources     String?  @default("[]")
+
+  // Billing
+  currentPlan           String   @default("free") // "free" | "basic" | "pro" | "premium"
+  billingStatus         String   @default("active") // "active" | "cancelled" | "pending"
+  subscriptionId        String?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  importedProducts      ImportedProduct[]
+}
+
+// Produits importés
+model ImportedProduct {
+  id                    String   @id @default(cuid())
+
+  // Boutique destination
+  shop                  String
+  settings              AppSettings @relation(fields: [shop], references: [shop], onDelete: Cascade)
+
+  // Produit source
+  sourceShop            String
+  sourceProductId       String   // ID Shopify du produit source
+  sourceProductHandle   String?
+  sourceProductUrl      String
+
+  // Produit destination
+  destinationProductId  String   // ID Shopify du produit créé
+  destinationHandle     String?
+
+  // Métadonnées
+  title                 String
+  status                String   @default("active") // "active" | "draft" | "archived"
+
+  // Pricing utilisé lors de l'import
+  pricingMode           String   // "markup" | "multiplier"
+  markupAmount          Float?
+  multiplier            Float?
+
+  // Synchronisation
+  lastSyncAt            DateTime?
+  syncEnabled           Boolean  @default(false)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  variants              VariantMapping[]
+
+  @@unique([shop, sourceProductId])
+  @@index([shop])
+  @@index([destinationProductId])
+}
+
+// Mapping des variants
+model VariantMapping {
+  id                    String   @id @default(cuid())
+
+  importedProductId     String
+  importedProduct       ImportedProduct @relation(fields: [importedProductId], references: [id], onDelete: Cascade)
+
+  sourceVariantId       String
+  destinationVariantId  String
+
+  title                 String?
+  sourcePrice           Float
+  destinationPrice      Float
+
+  sku                   String?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([importedProductId, sourceVariantId])
+  @@index([destinationVariantId])
+}
