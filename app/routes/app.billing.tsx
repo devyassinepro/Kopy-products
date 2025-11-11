@@ -27,6 +27,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Obtenir les infos du plan actuel
   const currentPlan = getPlanById(settings.currentPlan);
 
+  // Calculer les upgrades disponibles pour chaque plan (server-side)
+  const plansWithUpgradeInfo = Object.values(BILLING_PLANS).map((plan) => ({
+    ...plan,
+    isUpgrade: isUpgrade(settings.currentPlan, plan.id),
+  }));
+
   return Response.json({
     currentPlan: {
       id: settings.currentPlan,
@@ -39,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       maxProducts: limits.maxProducts,
       percentage: usagePercentage,
     },
-    plans: BILLING_PLANS,
+    plans: plansWithUpgradeInfo,
   });
 };
 
@@ -236,9 +242,9 @@ export default function Billing() {
       {/* Plans disponibles */}
       <s-section heading="Plans disponibles">
         <s-stack direction="block" gap="base">
-          {Object.values(plans).map((plan) => {
+          {plans.map((plan) => {
             const isCurrent = currentPlan.id === plan.id;
-            const upgradeAvailable = isUpgrade(currentPlan.id, plan.id);
+            const upgradeAvailable = plan.isUpgrade;
 
             return (
               <s-box

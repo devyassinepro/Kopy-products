@@ -8,104 +8,42 @@ import { parseShopifyProductUrl } from "../utils/validators";
 import { ERROR_MESSAGES } from "../utils/constants";
 
 /**
- * Récupère un produit via Storefront API (produits publics)
+ * Récupère un produit via l'endpoint JSON public de Shopify
+ * Cette méthode fonctionne pour toutes les boutiques Shopify sans authentification
  */
 export async function fetchProductFromStorefront(
   shop: string,
   handle: string,
 ): Promise<SourceProduct> {
-  const storefrontAccessToken = process.env.STOREFRONT_ACCESS_TOKEN;
-
-  // Pour l'instant, nous utilisons l'API publique
-  // Note: Pour un vrai shop source, il faudrait que le marchand configure un token
-  const query = `
-    query getProduct($handle: String!) {
-      productByHandle(handle: $handle) {
-        id
-        handle
-        title
-        description
-        descriptionHtml
-        vendor
-        productType
-        tags
-        images(first: 20) {
-          edges {
-            node {
-              id
-              url
-              altText
-            }
-          }
-        }
-        variants(first: 100) {
-          edges {
-            node {
-              id
-              title
-              price {
-                amount
-                currencyCode
-              }
-              compareAtPrice {
-                amount
-                currencyCode
-              }
-              sku
-              barcode
-              availableForSale
-              weight
-              weightUnit
-              requiresShipping
-              taxable
-              selectedOptions {
-                name
-                value
-              }
-            }
-          }
-        }
-        options {
-          name
-          values
-        }
-      }
-    }
-  `;
-
   try {
-    const response = await fetch(`https://${shop}/api/2024-10/graphql.json`, {
-      method: "POST",
+    // Construire l'URL avec .json pour obtenir les données du produit
+    const url = `https://${shop}/products/${handle}.json`;
+
+    const response = await fetch(url, {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
-        ...(storefrontAccessToken && {
-          "X-Shopify-Storefront-Access-Token": storefrontAccessToken,
-        }),
+        "User-Agent": "Kopy Products App",
       },
-      body: JSON.stringify({
-        query,
-        variables: { handle },
-      }),
     });
 
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(ERROR_MESSAGES.PRODUCT_NOT_FOUND);
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const result = await response.json();
+    const product = result.product;
 
-    if (result.errors) {
-      throw new Error(result.errors[0]?.message || "GraphQL error");
-    }
-
-    const product = result.data?.productByHandle;
     if (!product) {
       throw new Error(ERROR_MESSAGES.PRODUCT_NOT_FOUND);
     }
 
-    return transformStorefrontProduct(product);
+    return transformPublicJsonProduct(product);
   } catch (error) {
-    console.error("Error fetching product from Storefront API:", error);
+    console.error("Error fetching product from JSON endpoint:", error);
     throw new Error(
       error instanceof Error ? error.message : "Failed to fetch product",
     );
@@ -300,6 +238,80 @@ function transformAdminProduct(product: any): SourceProduct {
       product.options?.map((option: any) => ({
         name: option.name,
         values: option.values,
+      })) || [],
+  };
+}
+
+/**
+ * Transforme un produit depuis l'endpoint JSON public vers notre format interne
+ * Format: https://shop.myshopify.com/products/handle.json
+ */
+function transformPublicJsonProduct(product: any): SourceProduct {
+  return {
+    id: product.id?.toString() || "",
+    handle: product.handle || "",
+    title: product.title || "",
+    description: product.body_html
+      ? product.body_html.replace(/<[^>]*>/g, "")
+      : "",
+    descriptionHtml: product.body_html || "",
+    vendor: product.vendor || "",
+    productType: product.product_type || "",
+    tags: Array.isArray(product.tags)
+      ? product.tags
+      : typeof product.tags === "string"
+        ? product.tags.split(",").map((tag: string) => tag.trim())
+        : [],
+    images:
+      product.images?.map((image: any) => ({
+        id: image.id?.toString() || "",
+        url: image.src || "",
+        altText: image.alt || null,
+      })) || [],
+    variants:
+      product.variants?.map((variant: any) => {
+        // Construire les options sélectionnées à partir de option1, option2, option3
+        const selectedOptions = [];
+        if (product.options && product.options.length > 0) {
+          if (variant.option1) {
+            selectedOptions.push({
+              name: product.options[0]?.name || "Option 1",
+              value: variant.option1,
+            });
+          }
+          if (variant.option2 && product.options[1]) {
+            selectedOptions.push({
+              name: product.options[1].name,
+              value: variant.option2,
+            });
+          }
+          if (variant.option3 && product.options[2]) {
+            selectedOptions.push({
+              name: product.options[2].name,
+              value: variant.option3,
+            });
+          }
+        }
+
+        return {
+          id: variant.id?.toString() || "",
+          title: variant.title || "",
+          price: variant.price || "0",
+          compareAtPrice: variant.compare_at_price || null,
+          sku: variant.sku || "",
+          barcode: variant.barcode || "",
+          inventoryQuantity: variant.inventory_quantity || 0,
+          weight: variant.weight || 0,
+          weightUnit: variant.weight_unit || "kg",
+          requiresShipping: variant.requires_shipping ?? true,
+          taxable: variant.taxable ?? true,
+          options: selectedOptions,
+        };
+      }) || [],
+    options:
+      product.options?.map((option: any) => ({
+        name: option.name || "",
+        values: option.values || [],
       })) || [],
   };
 }

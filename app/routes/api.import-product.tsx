@@ -5,12 +5,10 @@
 
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { importProduct, isProductAlreadyImported } from "../services/product-importer.server";
+import { importProduct } from "../services/product-importer.server";
 import { canImportMoreProducts } from "../models/app-settings.server";
-import { isValidShopifyProductUrl, validatePricingConfig, parseShopifyProductUrl } from "../utils/validators";
 import { ERROR_MESSAGES } from "../utils/constants";
-import { extractIdFromGid } from "../utils/formatters";
-import type { PricingConfig } from "../utils/types";
+import type { PricingConfig, SourceProduct } from "../utils/types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -18,26 +16,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     const formData = await request.formData();
-    const url = formData.get("url") as string;
+    const productDataJson = formData.get("productData") as string;
+    const sourceUrl = formData.get("sourceUrl") as string;
     const pricingMode = formData.get("pricingMode") as string;
     const markupAmount = formData.get("markupAmount");
     const multiplier = formData.get("multiplier");
     const status = (formData.get("status") as string) || "ACTIVE";
 
     // Validations
-    if (!url) {
+    if (!productDataJson || !sourceUrl) {
       return Response.json(
-        { success: false, error: "URL requise" },
+        { success: false, error: "Données du produit requises" },
         { status: 400 },
       );
     }
 
-    if (!isValidShopifyProductUrl(url)) {
-      return Response.json(
-        { success: false, error: ERROR_MESSAGES.INVALID_SHOPIFY_URL },
-        { status: 400 },
-      );
-    }
+    const productData: SourceProduct = JSON.parse(productDataJson);
 
     // Construire la config de pricing
     const pricingConfig: PricingConfig = {
@@ -45,15 +39,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       markupAmount: markupAmount ? parseFloat(markupAmount as string) : undefined,
       multiplier: multiplier ? parseFloat(multiplier as string) : undefined,
     };
-
-    // Valider le pricing
-    const pricingValidation = validatePricingConfig(pricingConfig);
-    if (!pricingValidation.valid) {
-      return Response.json(
-        { success: false, error: pricingValidation.error },
-        { status: 400 },
-      );
-    }
 
     // Vérifier les limites du plan
     const limits = await canImportMoreProducts(shop);
@@ -67,17 +52,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    // Vérifier si le produit n'a pas déjà été importé
-    const parsedUrl = parseShopifyProductUrl(url);
-    if (parsedUrl) {
-      // Note: On ne peut vérifier que si on a l'ID du produit
-      // Pour l'instant, on laisse passer, l'import échouera si doublon
-    }
-
     // Importer le produit
     const result = await importProduct(
       shop,
-      url,
+      productData,
+      sourceUrl,
       pricingConfig,
       admin,
       status as "ACTIVE" | "DRAFT",
@@ -85,15 +64,40 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (!result.success) {
       return Response.json(
-        { success: false, error: result.errors?.[0] || "Échec de l'import" },
+        { success: false, error: result.error || "Échec de l'import" },
         { status: 500 },
       );
+    }
+
+    // Ajouter à la collection si spécifié
+    const collectionId = formData.get("collectionId") as string;
+    if (collectionId && result.product) {
+      try {
+        await admin.graphql(
+          `#graphql
+          mutation collectionAddProducts($id: ID!, $productIds: [ID!]!) {
+            collectionAddProducts(id: $id, productIds: $productIds) {
+              collection { id }
+              userErrors { field message }
+            }
+          }`,
+          {
+            variables: {
+              id: collectionId,
+              productIds: [result.product.id]
+            }
+          },
+        );
+      } catch (error) {
+        console.error("Error adding product to collection:", error);
+        // Ne pas faire échouer l'import si l'ajout à la collection échoue
+      }
     }
 
     return Response.json({
       success: true,
       product: result.product,
-      importedProduct: result.importedProductRecord,
+      importedProduct: result.importedProduct,
     });
   } catch (error) {
     console.error("Error importing product:", error);

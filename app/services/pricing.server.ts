@@ -3,8 +3,18 @@
  */
 
 import type { PricingConfig, VariantWithPricing, SourceProduct } from "../utils/types";
-import { calculateDestinationPrice } from "../utils/formatters";
+import { calculateDestinationPrice as calculateDestinationPriceUtil } from "../utils/formatters";
 import { validatePricingConfig, parsePrice, formatPrice } from "../utils/validators";
+
+/**
+ * Calcule le prix de destination (re-export pour faciliter l'utilisation)
+ */
+export function calculateDestinationPrice(
+  sourcePrice: number,
+  config: PricingConfig,
+): number {
+  return calculateDestinationPriceUtil(sourcePrice, config);
+}
 
 /**
  * Calcule les prix pour tous les variants d'un produit
@@ -21,7 +31,7 @@ export function calculateVariantsPricing(
 
   return sourceProduct.variants.map((variant) => {
     const originalPrice = parsePrice(variant.price);
-    const calculatedPrice = calculateDestinationPrice(originalPrice, pricingConfig);
+    const calculatedPrice = calculateDestinationPriceUtil(originalPrice, pricingConfig);
 
     return {
       id: variant.id,
@@ -46,7 +56,7 @@ export function calculateSingleVariantPrice(
   }
 
   const price = typeof sourcePrice === "string" ? parsePrice(sourcePrice) : sourcePrice;
-  return calculateDestinationPrice(price, pricingConfig);
+  return calculateDestinationPriceUtil(price, pricingConfig);
 }
 
 /**
@@ -78,7 +88,7 @@ export function prepareVariantsForCreation(
     let compareAtPrice: string | undefined;
     if (variant.compareAtPrice) {
       const originalCompareAtPrice = parsePrice(variant.compareAtPrice);
-      const calculatedCompareAtPrice = calculateDestinationPrice(
+      const calculatedCompareAtPrice = calculateDestinationPriceUtil(
         originalCompareAtPrice,
         pricingConfig,
       );

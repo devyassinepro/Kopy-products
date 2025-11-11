@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx prisma migrate dev:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npm run dev:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

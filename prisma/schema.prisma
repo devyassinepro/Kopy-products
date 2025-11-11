@@ -123,3 +123,46 @@ model VariantMapping {
   @@unique([importedProductId, sourceVariantId])
   @@index([destinationVariantId])
 }
+
+// Jobs d'import en bulk (arrière-plan)
+model BulkImportJob {
+  id                    String   @id @default(cuid())
+
+  // Boutique destination
+  shop                  String
+
+  // Boutique source
+  sourceShop            String
+  sourceShopUrl         String
+
+  // Configuration de l'import
+  pricingMode           String   // "markup" | "multiplier"
+  markupAmount          Float?
+  multiplier            Float?
+  status                String   @default("ACTIVE") // "ACTIVE" | "DRAFT"
+  collectionId          String?
+
+  // Liste des produits à importer (JSON array of product IDs)
+  productIds            String   // JSON array: ["123", "456"]
+
+  // Progression
+  totalProducts         Int
+  processedProducts     Int      @default(0)
+  successfulImports     Int      @default(0)
+  failedImports         Int      @default(0)
+
+  // Statut du job
+  jobStatus             String   @default("pending") // "pending" | "processing" | "completed" | "failed" | "cancelled"
+
+  // Erreurs (JSON array)
+  errors                String?  @default("[]")
+
+  // Timestamps
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([shop])
+  @@index([jobStatus])
+}
