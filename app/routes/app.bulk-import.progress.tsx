@@ -1,5 +1,5 @@
 /**
- * Page : Suivi de progression d'un job de bulk import
+ * Page: Bulk import job progress tracking
  */
 
 import { useState, useEffect } from "react";
@@ -21,7 +21,7 @@ export default function BulkImportProgress() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fonction pour récupérer le statut du job
+  // Function to fetch job status
   const fetchJobStatus = async () => {
     if (!jobId) return;
 
@@ -44,18 +44,18 @@ export default function BulkImportProgress() {
       }
     } catch (err) {
       console.error("Error fetching job status:", err);
-      setError("Erreur lors de la récupération du statut");
+      setError("Error retrieving status");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Récupérer le statut au chargement
+  // Fetch status on load
   useEffect(() => {
     fetchJobStatus();
   }, [jobId]);
 
-  // Auto-refresh toutes les 2 secondes si le job n'est pas terminé
+  // Auto-refresh every 2 seconds if job is not completed
   useEffect(() => {
     if (!job) return;
 
@@ -68,15 +68,15 @@ export default function BulkImportProgress() {
     }
   }, [job]);
 
-  // Si pas de jobId
+  // If no jobId
   if (!jobId) {
     return (
-      <s-page title="Erreur">
+      <s-page title="Error">
         <s-section>
           <s-card>
-            <p>Aucun job ID fourni.</p>
+            <p>No job ID provided.</p>
             <s-button onClick={() => navigate("/app/bulk-import")}>
-              Retour à l'import en masse
+              Back to bulk import
             </s-button>
           </s-card>
         </s-section>
@@ -84,38 +84,38 @@ export default function BulkImportProgress() {
     );
   }
 
-  // Calcul de la progression
+  // Calculate progress
   const progressPercentage = job
     ? Math.round((job.processedProducts / job.totalProducts) * 100)
     : 0;
 
-  // Statut en français
+  // Status labels
   const statusLabels: Record<string, string> = {
-    pending: "En attente",
-    processing: "En cours",
-    completed: "Terminé",
-    failed: "Échoué",
-    cancelled: "Annulé",
+    pending: "Pending",
+    processing: "In Progress",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
   };
 
   return (
-    <s-page title="Suivi de l'import en masse">
+    <s-page title="Bulk Import Tracking">
       <s-section>
         <s-card>
           {isLoading ? (
             <div style={{ textAlign: "center", padding: "20px" }}>
-              <p>Chargement...</p>
+              <p>Loading...</p>
             </div>
           ) : error ? (
             <div style={{ textAlign: "center", padding: "20px" }}>
-              <p style={{ color: "red" }}>Erreur : {error}</p>
+              <p style={{ color: "red" }}>Error: {error}</p>
               <s-button onClick={() => navigate("/app/bulk-import")}>
-                Retour à l'import en masse
+                Back to bulk import
               </s-button>
             </div>
           ) : job ? (
             <>
-              <h2 style={{ marginTop: 0 }}>Statut de l'import</h2>
+              <h2 style={{ marginTop: 0 }}>Import Status</h2>
 
               <div style={{ marginBottom: "20px" }}>
                 <div
@@ -126,10 +126,10 @@ export default function BulkImportProgress() {
                   }}
                 >
                   <span>
-                    <strong>Boutique source :</strong> {job.sourceShop}
+                    <strong>Source shop:</strong> {job.sourceShop}
                   </span>
                   <span>
-                    <strong>Statut :</strong>{" "}
+                    <strong>Status:</strong>{" "}
                     <span
                       style={{
                         padding: "4px 8px",
@@ -167,8 +167,8 @@ export default function BulkImportProgress() {
                   }}
                 >
                   <span>
-                    Progression : {job.processedProducts} / {job.totalProducts}{" "}
-                    produits
+                    Progress: {job.processedProducts} / {job.totalProducts}{" "}
+                    products
                   </span>
                   <span>{progressPercentage}%</span>
                 </div>
@@ -244,7 +244,7 @@ export default function BulkImportProgress() {
                   >
                     {job.successfulImports}
                   </div>
-                  <div style={{ color: "#155724" }}>Réussis</div>
+                  <div style={{ color: "#155724" }}>Successful</div>
                 </div>
 
                 <div
@@ -264,7 +264,7 @@ export default function BulkImportProgress() {
                   >
                     {job.failedImports}
                   </div>
-                  <div style={{ color: "#721c24" }}>Échoués</div>
+                  <div style={{ color: "#721c24" }}>Failed</div>
                 </div>
               </div>
 
@@ -279,10 +279,9 @@ export default function BulkImportProgress() {
                   }}
                 >
                   <p style={{ margin: 0 }}>
-                    <strong>Note :</strong> L'import est en cours d'exécution en
-                    arrière-plan. Vous pouvez quitter cette page en toute
-                    sécurité, l'import continuera. Cette page se rafraîchit
-                    automatiquement.
+                    <strong>Note:</strong> The import is running in the
+                    background. You can safely leave this page, the import will
+                    continue. This page refreshes automatically.
                   </p>
                 </div>
               )}
@@ -297,8 +296,8 @@ export default function BulkImportProgress() {
                   }}
                 >
                   <p style={{ margin: 0, color: "#155724" }}>
-                    <strong>Import terminé !</strong> {job.successfulImports}{" "}
-                    produit(s) importé(s) avec succès.
+                    <strong>Import completed!</strong> {job.successfulImports}{" "}
+                    product(s) imported successfully.
                   </p>
                 </div>
               )}
@@ -313,14 +312,14 @@ export default function BulkImportProgress() {
                   }}
                 >
                   <p style={{ margin: 0, color: "#721c24" }}>
-                    <strong>Erreur :</strong> L'import a échoué.
+                    <strong>Error:</strong> The import failed.
                   </p>
                 </div>
               )}
 
               {job.errors && job.errors.length > 0 && (
                 <div style={{ marginBottom: "20px" }}>
-                  <h3>Erreurs rencontrées ({job.errors.length})</h3>
+                  <h3>Errors encountered ({job.errors.length})</h3>
                   <div
                     style={{
                       maxHeight: "300px",
@@ -344,7 +343,7 @@ export default function BulkImportProgress() {
                       >
                         {err.productId && (
                           <div>
-                            <strong>Produit :</strong> {err.productId}
+                            <strong>Product:</strong> {err.productId}
                           </div>
                         )}
                         <div style={{ color: "#666" }}>{err.error}</div>
@@ -356,15 +355,15 @@ export default function BulkImportProgress() {
 
               <div style={{ marginTop: "20px" }}>
                 <div style={{ fontSize: "12px", color: "#666" }}>
-                  <div>Créé le : {new Date(job.createdAt).toLocaleString()}</div>
+                  <div>Created on: {new Date(job.createdAt).toLocaleString()}</div>
                   {job.startedAt && (
                     <div>
-                      Démarré le : {new Date(job.startedAt).toLocaleString()}
+                      Started on: {new Date(job.startedAt).toLocaleString()}
                     </div>
                   )}
                   {job.completedAt && (
                     <div>
-                      Terminé le : {new Date(job.completedAt).toLocaleString()}
+                      Completed on: {new Date(job.completedAt).toLocaleString()}
                     </div>
                   )}
                 </div>
@@ -378,15 +377,15 @@ export default function BulkImportProgress() {
                 }}
               >
                 <s-button onClick={() => navigate("/app/bulk-import")}>
-                  Nouvel import
+                  New import
                 </s-button>
                 <s-button onClick={() => navigate("/app/history")}>
-                  Voir l'historique
+                  View history
                 </s-button>
                 {(job.jobStatus === "processing" ||
                   job.jobStatus === "pending") && (
                   <s-button onClick={fetchJobStatus}>
-                    Rafraîchir maintenant
+                    Refresh now
                   </s-button>
                 )}
               </div>

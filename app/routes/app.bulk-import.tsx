@@ -1,5 +1,5 @@
 /**
- * Page : Bulk Import - Importer plusieurs produits en masse
+ * Page: Bulk Import - Import multiple products in bulk
  */
 
 import { useState, useEffect } from "react";
@@ -8,15 +8,15 @@ import { useActionData, useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getOrCreateAppSettings } from "../models/app-settings.server";
 
-// Loader pour récupérer les paramètres
+// Loader to retrieve settings
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Récupérer les paramètres de l'application
+  // Get application settings
   const settings = await getOrCreateAppSettings(shop);
 
-  // Récupérer les collections disponibles
+  // Get available collections
   const collectionsResponse = await admin.graphql(`
     query {
       collections(first: 100) {
@@ -49,21 +49,21 @@ export default function BulkImport() {
   const actionData = useActionData<any>();
   const navigate = useNavigate();
 
-  // État pour l'URL de la boutique
+  // State for shop URL
   const [shopUrl, setShopUrl] = useState("");
   const [isFetching, setIsFetching] = useState(false);
 
-  // État pour les produits récupérés
+  // State for retrieved products
   const [products, setProducts] = useState<any[]>([]);
   const [shopDomain, setShopDomain] = useState("");
 
-  // État pour la sélection (stocke les objets {id, handle})
+  // State for selection (stores objects {id, handle})
   const [selectedProducts, setSelectedProducts] = useState<
     Map<string, { id: string; handle: string }>
   >(new Map());
   const [selectAll, setSelectAll] = useState(false);
 
-  // Configuration de pricing
+  // Pricing configuration
   const [pricingMode, setPricingMode] = useState(settings.defaultPricingMode);
   const [markupAmount, setMarkupAmount] = useState(
     settings.defaultMarkupAmount.toString(),
@@ -72,17 +72,17 @@ export default function BulkImport() {
     settings.defaultMultiplier.toString(),
   );
 
-  // Statut et collection
+  // Status and collection
   const [status, setStatus] = useState("ACTIVE");
   const [collectionId, setCollectionId] = useState("");
 
-  // État pour l'import
+  // State for import
   const [isImporting, setIsImporting] = useState(false);
 
-  // Fonction pour récupérer les produits
+  // Function to fetch products
   const fetchProducts = async () => {
     if (!shopUrl.trim()) {
-      alert("Veuillez entrer une URL de boutique");
+      alert("Please enter a shop URL");
       return;
     }
 
@@ -102,17 +102,17 @@ export default function BulkImport() {
         setProducts(data.products || []);
         setShopDomain(data.shopDomain);
       } else {
-        alert(`Erreur : ${data.error}`);
+        alert(`Error: ${data.error}`);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
-      alert("Erreur lors de la récupération des produits");
+      alert("Error fetching products");
     } finally {
       setIsFetching(false);
     }
   };
 
-  // Gérer la sélection globale
+  // Handle global selection
   useEffect(() => {
     if (selectAll) {
       const newMap = new Map<string, { id: string; handle: string }>();
@@ -125,7 +125,7 @@ export default function BulkImport() {
     }
   }, [selectAll, products]);
 
-  // Fonction pour basculer la sélection d'un produit
+  // Function to toggle product selection
   const toggleProductSelection = (product: {
     id: string;
     handle: string;
@@ -139,10 +139,10 @@ export default function BulkImport() {
     setSelectedProducts(newSelected);
   };
 
-  // Fonction pour lancer l'import
+  // Function to start import
   const startImport = async () => {
     if (selectedProducts.size === 0) {
-      alert("Veuillez sélectionner au moins un produit");
+      alert("Please select at least one product");
       return;
     }
 
@@ -152,7 +152,7 @@ export default function BulkImport() {
       const formData = new FormData();
       formData.append("sourceShopUrl", `https://${shopDomain}`);
       formData.append("sourceShop", shopDomain);
-      // Convertir la Map en array d'objets {id, handle}
+      // Convert Map to array of objects {id, handle}
       formData.append(
         "productData",
         JSON.stringify(Array.from(selectedProducts.values())),
@@ -173,32 +173,32 @@ export default function BulkImport() {
       const data = await response.json();
 
       if (data.success) {
-        // Rediriger vers la page de progression
+        // Redirect to progress page
         navigate(`/app/bulk-import/progress?jobId=${data.jobId}`);
       } else {
-        alert(`Erreur : ${data.error}`);
+        alert(`Error: ${data.error}`);
         setIsImporting(false);
       }
     } catch (error) {
       console.error("Error starting import:", error);
-      alert("Erreur lors du lancement de l'import");
+      alert("Error starting import");
       setIsImporting(false);
     }
   };
 
   return (
-    <s-page title="Import en masse">
+    <s-page title="Bulk Import">
       <s-section>
         <s-card>
-          <h2 style={{ marginTop: 0 }}>1. Récupérer les produits</h2>
-          <p>Entrez l'URL de la boutique Shopify source :</p>
+          <h2 style={{ marginTop: 0 }}>1. Fetch Products</h2>
+          <p>Enter the source Shopify shop URL:</p>
 
           <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
             <input
               type="text"
               value={shopUrl}
               onChange={(e) => setShopUrl(e.target.value)}
-              placeholder="example.myshopify.com ou example.com"
+              placeholder="example.myshopify.com or example.com"
               style={{
                 flex: 1,
                 padding: "8px",
@@ -211,7 +211,7 @@ export default function BulkImport() {
               disabled={isFetching || !shopUrl.trim()}
               variant="primary"
             >
-              {isFetching ? "Chargement..." : "Récupérer les produits"}
+              {isFetching ? "Loading..." : "Fetch Products"}
             </s-button>
           </div>
         </s-card>
@@ -222,7 +222,7 @@ export default function BulkImport() {
           <s-section>
             <s-card>
               <h2 style={{ marginTop: 0 }}>
-                2. Sélectionner les produits ({selectedProducts.size}/
+                2. Select Products ({selectedProducts.size}/
                 {products.length})
               </h2>
 
@@ -234,7 +234,7 @@ export default function BulkImport() {
                     onChange={(e) => setSelectAll(e.target.checked)}
                     style={{ marginRight: "8px" }}
                   />
-                  Sélectionner tous les produits
+                  Select all products
                 </label>
               </div>
 
@@ -262,19 +262,19 @@ export default function BulkImport() {
                         Image
                       </th>
                       <th style={{ padding: "10px", textAlign: "left" }}>
-                        Titre
+                        Title
                       </th>
                       <th style={{ padding: "10px", textAlign: "left" }}>
-                        Vendeur
+                        Vendor
                       </th>
                       <th style={{ padding: "10px", textAlign: "left" }}>
                         Type
                       </th>
                       <th style={{ padding: "10px", textAlign: "left" }}>
-                        Prix
+                        Price
                       </th>
                       <th style={{ padding: "10px", textAlign: "left" }}>
-                        Variantes
+                        Variants
                       </th>
                     </tr>
                   </thead>
@@ -343,7 +343,7 @@ export default function BulkImport() {
 
           <s-section>
             <s-card>
-              <h2 style={{ marginTop: 0 }}>3. Configuration de l'import</h2>
+              <h2 style={{ marginTop: 0 }}>3. Import Configuration</h2>
 
               <div style={{ marginBottom: "20px" }}>
                 <h3>Pricing</h3>
@@ -356,7 +356,7 @@ export default function BulkImport() {
                       checked={pricingMode === "markup"}
                       onChange={(e) => setPricingMode(e.target.value)}
                     />{" "}
-                    Ajouter un montant fixe
+                    Add fixed amount
                   </label>
                   <input
                     type="number"
@@ -378,7 +378,7 @@ export default function BulkImport() {
                       checked={pricingMode === "multiplier"}
                       onChange={(e) => setPricingMode(e.target.value)}
                     />{" "}
-                    Multiplier par
+                    Multiply by
                   </label>
                   <input
                     type="number"
@@ -393,25 +393,25 @@ export default function BulkImport() {
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <h3>Statut</h3>
+                <h3>Status</h3>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
                   style={{ padding: "8px", borderRadius: "4px" }}
                 >
-                  <option value="ACTIVE">Actif</option>
-                  <option value="DRAFT">Brouillon</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="DRAFT">Draft</option>
                 </select>
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <h3>Collection (optionnel)</h3>
+                <h3>Collection (optional)</h3>
                 <select
                   value={collectionId}
                   onChange={(e) => setCollectionId(e.target.value)}
                   style={{ padding: "8px", borderRadius: "4px", width: "100%" }}
                 >
-                  <option value="">Aucune collection</option>
+                  <option value="">No collection</option>
                   {collections.map((collection: any) => (
                     <option key={collection.id} value={collection.id}>
                       {collection.title}
@@ -428,9 +428,9 @@ export default function BulkImport() {
                   marginBottom: "20px",
                 }}
               >
-                <strong>Note :</strong> L'import se fera en arrière-plan. Vous
-                pouvez quitter cette page, l'import continuera. Vous pourrez
-                suivre la progression sur la page suivante.
+                <strong>Note:</strong> The import will run in the background. You
+                can leave this page, the import will continue. You can
+                track progress on the next page.
               </div>
 
               <s-button
@@ -440,8 +440,8 @@ export default function BulkImport() {
                 style={{ width: "100%" }}
               >
                 {isImporting
-                  ? "Lancement en cours..."
-                  : `Importer ${selectedProducts.size} produit${selectedProducts.size > 1 ? "s" : ""}`}
+                  ? "Starting import..."
+                  : `Import ${selectedProducts.size} product${selectedProducts.size > 1 ? "s" : ""}`}
               </s-button>
             </s-card>
           </s-section>

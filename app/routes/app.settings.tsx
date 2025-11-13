@@ -1,5 +1,5 @@
 /**
- * Page Paramètres : Configuration de l'application
+ * Settings Page: Application configuration
  */
 
 import { useState, useEffect } from "react";
@@ -12,22 +12,59 @@ import {
   getOrCreateAppSettings,
   updateDefaultPricing,
   updateSyncSettings,
+  updateDefaultOrganization,
   addAuthorizedSource,
   removeAuthorizedSource,
   getAuthorizedSources,
-  getCurrentPlanWithLimits,
 } from "../models/app-settings.server";
 import { normalizeShopifyDomain, isValidShopifyDomain } from "../utils/validators";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const [settings, authorizedSources, planInfo] = await Promise.all([
+  const [settings, authorizedSources] = await Promise.all([
     getOrCreateAppSettings(shop),
     getAuthorizedSources(shop),
-    getCurrentPlanWithLimits(shop),
   ]);
+
+  // Fetch collections for default collection selection
+  const collectionsResponse = await admin.graphql(
+    `#graphql
+    query getCollections {
+      collections(first: 250) {
+        edges {
+          node {
+            id
+            title
+          }
+        }
+      }
+    }`,
+  );
+
+  const collectionsData = await collectionsResponse.json();
+  const collections = collectionsData.data.collections.edges.map((edge: any) => ({
+    id: edge.node.id,
+    title: edge.node.title,
+  }));
+
+  // Free plan info (no limits)
+  const planInfo = {
+    limits: {
+      name: "Free",
+      autoSync: false, // Disabled for free plan
+      syncFrequency: "daily",
+      features: [
+        "Unlimited product imports",
+        "Single product import",
+        "Bulk import",
+        "Price configuration",
+        "Image management",
+        "Collection assignment",
+      ],
+    },
+  };
 
   return Response.json({
     settings: {
@@ -36,8 +73,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       defaultMultiplier: settings.defaultMultiplier,
       autoSyncEnabled: settings.autoSyncEnabled,
       syncFrequency: settings.syncFrequency,
+      defaultCollectionId: settings.defaultCollectionId,
+      defaultTags: settings.defaultTags,
+      autoPublish: settings.autoPublish,
+      termsAccepted: settings.termsAccepted,
+      termsAcceptedAt: settings.termsAcceptedAt?.toISOString() || null,
     },
     authorizedSources,
+    collections,
     plan: planInfo,
   });
 };
@@ -58,7 +101,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         await updateDefaultPricing(shop, pricingMode, markupAmount, multiplier);
 
-        return Response.json({ success: true, message: "Paramètres de pricing mis à jour" });
+        return Response.json({ success: true, message: "Pricing settings updated" });
       }
 
       case "updateSync": {
@@ -69,7 +112,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         return Response.json({
           success: true,
-          message: "Paramètres de synchronisation mis à jour",
+          message: "Synchronization settings updated",
         });
       }
 
@@ -79,14 +122,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (!isValidShopifyDomain(normalized)) {
           return Response.json(
-            { success: false, error: "Domaine Shopify invalide" },
+            { success: false, error: "Invalid Shopify domain" },
             { status: 400 },
           );
         }
 
         await addAuthorizedSource(shop, normalized);
 
-        return Response.json({ success: true, message: "Magasin source ajouté" });
+        return Response.json({ success: true, message: "Source store added" });
       }
 
       case "removeSource": {
@@ -94,18 +137,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         await removeAuthorizedSource(shop, source);
 
-        return Response.json({ success: true, message: "Magasin source retiré" });
+        return Response.json({ success: true, message: "Source store removed" });
+      }
+
+      case "updateOrganization": {
+        const defaultCollectionId = formData.get("defaultCollectionId") as string | null;
+        const defaultTags = formData.get("defaultTags") as string | null;
+        const autoPublish = formData.get("autoPublish") === "true";
+
+        await updateDefaultOrganization(shop, defaultCollectionId, defaultTags, autoPublish);
+
+        return Response.json({
+          success: true,
+          message: "Organization settings updated",
+        });
       }
 
       default:
-        return Response.json({ success: false, error: "Action invalide" }, { status: 400 });
+        return Response.json({ success: false, error: "Invalid action" }, { status: 400 });
     }
   } catch (error) {
     console.error("Settings action error:", error);
     return Response.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Erreur inconnue",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     );
@@ -113,11 +169,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { settings, authorizedSources, plan } = useLoaderData<typeof loader>();
+  const { settings, authorizedSources, collections, plan } = useLoaderData<typeof loader>();
   const shopify = useAppBridge();
   const fetcher = useFetcher<typeof action>();
 
-  // State pour pricing
+  // State for pricing
   const [pricingMode, setPricingMode] = useState(settings.defaultPricingMode);
   const [markupAmount, setMarkupAmount] = useState(
     settings.defaultMarkupAmount.toString(),
@@ -126,17 +182,22 @@ export default function Settings() {
     settings.defaultMultiplier.toString(),
   );
 
-  // State pour sync
+  // State for sync
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(settings.autoSyncEnabled);
   const [syncFrequency, setSyncFrequency] = useState(settings.syncFrequency || "daily");
 
-  // State pour sources
+  // State for sources
   const [newSource, setNewSource] = useState("");
 
-  // Gérer les réponses
+  // State for organization
+  const [defaultCollectionId, setDefaultCollectionId] = useState(settings.defaultCollectionId || "");
+  const [defaultTags, setDefaultTags] = useState(settings.defaultTags || "");
+  const [autoPublish, setAutoPublish] = useState(settings.autoPublish);
+
+  // Handle responses
   useEffect(() => {
     if (fetcher.data?.success) {
-      shopify.toast.show(fetcher.data.message || "Paramètres enregistrés");
+      shopify.toast.show(fetcher.data.message || "Settings saved");
     } else if (fetcher.data?.error) {
       shopify.toast.show(fetcher.data.error, { isError: true });
     }
@@ -144,7 +205,7 @@ export default function Settings() {
 
   const isLoading = fetcher.state !== "idle";
 
-  // Fonctions
+  // Functions
   const handleSavePricing = () => {
     const formData = new FormData();
     formData.append("action", "updatePricing");
@@ -158,7 +219,7 @@ export default function Settings() {
   const handleSaveSync = () => {
     if (!plan.limits.autoSync) {
       shopify.toast.show(
-        "La synchronisation automatique nécessite un plan Pro ou Premium",
+        "Automatic synchronization requires a Pro or Premium plan",
         { isError: true },
       );
       return;
@@ -174,7 +235,7 @@ export default function Settings() {
 
   const handleAddSource = () => {
     if (!newSource.trim()) {
-      shopify.toast.show("Veuillez entrer un domaine", { isError: true });
+      shopify.toast.show("Please enter a domain", { isError: true });
       return;
     }
 
@@ -194,38 +255,48 @@ export default function Settings() {
     fetcher.submit(formData, { method: "POST" });
   };
 
+  const handleSaveOrganization = () => {
+    const formData = new FormData();
+    formData.append("action", "updateOrganization");
+    formData.append("defaultCollectionId", defaultCollectionId);
+    formData.append("defaultTags", defaultTags);
+    formData.append("autoPublish", autoPublish.toString());
+
+    fetcher.submit(formData, { method: "POST" });
+  };
+
   return (
-    <s-page heading="Paramètres">
+    <s-page heading="Settings">
       <s-link slot="back-action" href="/app" />
 
-      {/* Section 1: Pricing par défaut */}
-      <s-section heading="Pricing par défaut">
+      {/* Section 1: Default pricing */}
+      <s-section heading="Default pricing">
         <s-stack direction="block" gap="base">
           <s-paragraph>
-            Configuration par défaut utilisée lors de l'import de produits. Vous
-            pourrez toujours la modifier pour chaque produit.
+            Default configuration used when importing products. You can
+            always modify it for each product.
           </s-paragraph>
 
           <s-choice-list
-            label="Mode de pricing"
+            label="Pricing mode"
             value={pricingMode}
             onChange={(e: any) => setPricingMode(e.target.value)}
           >
             <s-radio value="markup">
-              Markup fixe (ajouter un montant aux prix)
+              Fixed markup (add an amount to prices)
             </s-radio>
             <s-radio value="multiplier">
-              Multiplicateur (multiplier les prix)
+              Multiplier (multiply prices)
             </s-radio>
           </s-choice-list>
 
           {pricingMode === "markup" && (
             <s-text-field
               type="number"
-              label="Montant du markup par défaut (€)"
+              label="Default markup amount ($)"
               value={markupAmount}
               onChange={(e: any) => setMarkupAmount(e.target.value)}
-              helpText="Exemple: 10 pour ajouter 10€ à chaque prix"
+              helpText="Example: 10 to add $10 to each price"
               step="0.01"
             />
           )}
@@ -233,10 +304,10 @@ export default function Settings() {
           {pricingMode === "multiplier" && (
             <s-text-field
               type="number"
-              label="Multiplicateur par défaut"
+              label="Default multiplier"
               value={multiplier}
               onChange={(e: any) => setMultiplier(e.target.value)}
-              helpText="Exemple: 1.5 pour augmenter les prix de 50%"
+              helpText="Example: 1.5 to increase prices by 50%"
               step="0.01"
               min="0.1"
             />
@@ -247,45 +318,44 @@ export default function Settings() {
             onClick={handleSavePricing}
             {...(isLoading ? { loading: true } : {})}
           >
-            Enregistrer les paramètres de pricing
+            Save pricing settings
           </s-button>
         </s-stack>
       </s-section>
 
-      {/* Section 2: Synchronisation automatique */}
-      <s-section heading="Synchronisation automatique">
+      {/* Section 2: Automatic synchronization */}
+      <s-section heading="Automatic synchronization">
         <s-stack direction="block" gap="base">
           {!plan.limits.autoSync ? (
             <s-banner tone="info">
               <s-paragraph>
-                La synchronisation automatique est disponible avec les plans Pro et
-                Premium. <s-link href="/app/billing">Voir les plans</s-link>
+                Automatic synchronization is not yet available. This feature will be added in a future version.
               </s-paragraph>
             </s-banner>
           ) : (
             <>
               <s-paragraph>
-                Permet de synchroniser automatiquement les prix des produits importés
-                lorsque les produits sources changent.
+                Allows automatic synchronization of imported product prices
+                when source products change.
               </s-paragraph>
 
               <s-checkbox
                 checked={autoSyncEnabled}
                 onChange={(e: any) => setAutoSyncEnabled(e.target.checked)}
               >
-                Activer la synchronisation automatique
+                Enable automatic synchronization
               </s-checkbox>
 
               {autoSyncEnabled && (
                 <s-select
-                  label="Fréquence de synchronisation"
+                  label="Synchronization frequency"
                   value={syncFrequency}
                   onChange={(e: any) => setSyncFrequency(e.target.value)}
                 >
-                  <option value="daily">Quotidienne</option>
-                  <option value="weekly">Hebdomadaire</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
                   {plan.limits.syncFrequency === "realtime" && (
-                    <option value="realtime">Temps réel (webhooks)</option>
+                    <option value="realtime">Real-time (webhooks)</option>
                   )}
                 </s-select>
               )}
@@ -295,19 +365,19 @@ export default function Settings() {
                 onClick={handleSaveSync}
                 {...(isLoading ? { loading: true } : {})}
               >
-                Enregistrer les paramètres de synchronisation
+                Save synchronization settings
               </s-button>
             </>
           )}
         </s-stack>
       </s-section>
 
-      {/* Section 3: Magasins sources autorisés */}
-      <s-section heading="Magasins sources autorisés">
+      {/* Section 3: Authorized source stores */}
+      <s-section heading="Authorized source stores">
         <s-stack direction="block" gap="base">
           <s-paragraph>
-            Configurez les boutiques Shopify depuis lesquelles vous pouvez importer
-            des produits. Laissez vide pour autoriser toutes les boutiques.
+            Configure the Shopify stores from which you can import
+            products. Leave empty to allow all stores.
           </s-paragraph>
 
           {/* Liste des sources */}
@@ -331,34 +401,138 @@ export default function Settings() {
                     onClick={() => handleRemoveSource(source)}
                     {...(isLoading ? { disabled: true } : {})}
                   >
-                    Retirer
+                    Remove
                   </s-button>
                 </s-stack>
               ))}
             </s-stack>
           )}
 
-          {/* Ajouter une source */}
+          {/* Add a source */}
           <s-stack direction="inline" gap="base">
             <s-text-field
-              label="Nouveau magasin source"
+              label="New source store"
               value={newSource}
               onChange={(e: any) => setNewSource(e.target.value)}
               placeholder="example.myshopify.com"
-              helpText="Format: boutique.myshopify.com ou boutique.com"
+              helpText="Format: store.myshopify.com or store.com"
             />
             <s-button
               onClick={handleAddSource}
               {...(isLoading ? { loading: true } : {})}
             >
-              Ajouter
+              Add
             </s-button>
           </s-stack>
         </s-stack>
       </s-section>
 
-      {/* Section aside: Plan actuel */}
-      <s-section slot="aside" heading="Plan actuel">
+      {/* Section 4: Product Organization */}
+      <s-section heading="📂 Product organization">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            Default configuration for organizing imported products in your store.
+          </s-paragraph>
+
+          <s-select
+            label="Default collection"
+            value={defaultCollectionId}
+            onChange={(e: any) => setDefaultCollectionId(e.target.value)}
+            helpText="New products will be automatically added to this collection"
+          >
+            <option value="">-- No default collection --</option>
+            {collections && collections.length > 0 ? (
+              collections.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))
+            ) : null}
+          </s-select>
+
+          <s-text-field
+            label="Default tags"
+            value={defaultTags}
+            onChange={(e: any) => setDefaultTags(e.target.value)}
+            placeholder='["tag1", "tag2", "tag3"]'
+            helpText='JSON format: ["tag1", "tag2"] or empty'
+          />
+
+          <s-checkbox
+            checked={autoPublish}
+            onChange={(e: any) => setAutoPublish(e.target.checked)}
+          >
+            <s-text fontWeight="semibold">Auto-publish imported products</s-text>
+          </s-checkbox>
+
+          <s-banner tone={autoPublish ? "warning" : "info"}>
+            <s-stack direction="block" gap="tight">
+              {autoPublish ? (
+                <>
+                  <s-text fontWeight="semibold">⚠️ Auto-publish enabled</s-text>
+                  <s-paragraph size="small">
+                    Products will be immediately visible to customers after import.
+                    Make sure to verify details before importing.
+                  </s-paragraph>
+                </>
+              ) : (
+                <>
+                  <s-text fontWeight="semibold">ℹ️ Products will be saved as drafts</s-text>
+                  <s-paragraph size="small">
+                    Imported products will be saved as drafts, giving you time
+                    to review them before making them visible.
+                  </s-paragraph>
+                </>
+              )}
+            </s-stack>
+          </s-banner>
+
+          <s-button
+            variant="primary"
+            onClick={handleSaveOrganization}
+            {...(isLoading ? { loading: true } : {})}
+          >
+            Save organization settings
+          </s-button>
+        </s-stack>
+      </s-section>
+
+      {/* Section 5: Terms & Conditions */}
+      <s-section heading="📜 Terms of use">
+        <s-stack direction="block" gap="base">
+          <s-banner tone="warning">
+            <s-paragraph>
+              By using this application, you acknowledge that you have read and agree to comply with all
+              applicable laws and Shopify policies regarding product import and resale.
+            </s-paragraph>
+          </s-banner>
+
+          {settings.termsAccepted && settings.termsAcceptedAt && (
+            <s-banner tone="success">
+              <s-paragraph size="small">
+                ✅ Terms accepted on: {new Date(settings.termsAcceptedAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </s-paragraph>
+            </s-banner>
+          )}
+
+          {!settings.termsAccepted && (
+            <s-banner tone="info">
+              <s-paragraph>
+                You must accept the terms of use from the home screen to use the application.
+              </s-paragraph>
+            </s-banner>
+          )}
+        </s-stack>
+      </s-section>
+
+      {/* Section aside: Current plan */}
+      <s-section slot="aside" heading="Current plan">
         <s-stack direction="block" gap="base">
           <s-paragraph>
             <s-text fontWeight="bold">{plan.limits.name}</s-text>
@@ -370,7 +544,9 @@ export default function Settings() {
             ))}
           </s-unordered-list>
 
-          <s-link href="/app/billing">Gérer votre abonnement</s-link>
+          <s-banner tone="success">
+            <s-paragraph>All features are completely free!</s-paragraph>
+          </s-banner>
         </s-stack>
       </s-section>
     </s-page>

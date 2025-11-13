@@ -457,6 +457,8 @@ export async function importProduct(
         pricingMode: pricingConfig.mode,
         markupAmount: pricingConfig.markupAmount,
         multiplier: pricingConfig.multiplier,
+        productImage: sourceProduct.images?.[0]?.url || null,
+        price: sourceProduct.variants?.[0] ? calculateDestinationPrice(parseFloat(sourceProduct.variants[0].price), pricingConfig) : null,
         syncEnabled: false,
         variants: {
           create: product.variants.edges.map((edge, index) => {

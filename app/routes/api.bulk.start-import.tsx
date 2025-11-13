@@ -7,7 +7,6 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { startBulkImportJob } from "../services/bulk-import-worker.server";
-import { canImportMoreProducts } from "../models/app-settings.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);

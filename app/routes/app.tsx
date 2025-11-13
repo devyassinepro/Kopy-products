@@ -18,10 +18,11 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Importer</s-link>
-        <s-link href="/app/history">Historique</s-link>
-        <s-link href="/app/settings">Paramètres</s-link>
-        <s-link href="/app/billing">Abonnement</s-link>
+        <s-link href="/app">Import</s-link>
+        <s-link href="/app/bulk-import">Bulk Import</s-link>
+        <s-link href="/app/history">History</s-link>
+        <s-link href="/app/settings">Settings</s-link>
+        {/* <s-link href="/app/billing">Abonnement</s-link> */}
       </s-app-nav>
       <Outlet />
     </AppProvider>

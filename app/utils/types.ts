@@ -2,10 +2,9 @@
  * Types et interfaces TypeScript pour Kopy Products
  */
 
-import type { BILLING_PLANS, PRICING_MODES, PRODUCT_STATUS } from "./constants";
+import type { PRICING_MODES, PRODUCT_STATUS } from "./constants";
 
 // Types dérivés des constantes
-export type BillingPlanId = keyof typeof BILLING_PLANS;
 export type PricingMode = (typeof PRICING_MODES)[keyof typeof PRICING_MODES];
 export type ProductStatus = (typeof PRODUCT_STATUS)[keyof typeof PRODUCT_STATUS];
 

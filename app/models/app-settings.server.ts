@@ -1,19 +1,20 @@
 /**
- * Model pour AppSettings - Configuration de l'application par boutique
+ * Model for AppSettings - Application configuration per store
  */
 
 import prisma from "../db.server";
 import type { AppSettings } from "@prisma/client";
-import { BILLING_PLANS } from "../utils/constants";
 import {
   parseAuthorizedSources,
   stringifyAuthorizedSources,
 } from "../utils/formatters";
 
 /**
- * Récupère ou crée les paramètres pour une boutique
+ * Get or create settings for a store
  */
-export async function getOrCreateAppSettings(shop: string): Promise<AppSettings> {
+export async function getOrCreateAppSettings(
+  shop: string,
+): Promise<AppSettings> {
   let settings = await prisma.appSettings.findUnique({
     where: { shop },
   });
@@ -26,8 +27,6 @@ export async function getOrCreateAppSettings(shop: string): Promise<AppSettings>
         defaultMarkupAmount: 0,
         defaultMultiplier: 1.0,
         autoSyncEnabled: false,
-        currentPlan: "free",
-        billingStatus: "active",
         authorizedSources: "[]",
       },
     });
@@ -37,7 +36,7 @@ export async function getOrCreateAppSettings(shop: string): Promise<AppSettings>
 }
 
 /**
- * Met à jour les paramètres de pricing par défaut
+ * Update default pricing settings
  */
 export async function updateDefaultPricing(
   shop: string,
@@ -58,7 +57,7 @@ export async function updateDefaultPricing(
 }
 
 /**
- * Met à jour les paramètres de synchronisation
+ * Update synchronization settings
  */
 export async function updateSyncSettings(
   shop: string,
@@ -77,44 +76,7 @@ export async function updateSyncSettings(
 }
 
 /**
- * Met à jour le plan de facturation
- */
-export async function updateBillingPlan(
-  shop: string,
-  plan: string,
-  subscriptionId?: string,
-): Promise<AppSettings> {
-  await getOrCreateAppSettings(shop);
-
-  return prisma.appSettings.update({
-    where: { shop },
-    data: {
-      currentPlan: plan,
-      subscriptionId: subscriptionId || null,
-      billingStatus: "active",
-    },
-  });
-}
-
-/**
- * Met à jour le statut de facturation
- */
-export async function updateBillingStatus(
-  shop: string,
-  status: string,
-): Promise<AppSettings> {
-  await getOrCreateAppSettings(shop);
-
-  return prisma.appSettings.update({
-    where: { shop },
-    data: {
-      billingStatus: status,
-    },
-  });
-}
-
-/**
- * Ajoute une source autorisée
+ * Add an authorized source
  */
 export async function addAuthorizedSource(
   shop: string,
@@ -136,7 +98,7 @@ export async function addAuthorizedSource(
 }
 
 /**
- * Retire une source autorisée
+ * Remove an authorized source
  */
 export async function removeAuthorizedSource(
   shop: string,
@@ -156,7 +118,7 @@ export async function removeAuthorizedSource(
 }
 
 /**
- * Obtient les sources autorisées
+ * Get authorized sources
  */
 export async function getAuthorizedSources(shop: string): Promise<string[]> {
   const settings = await getOrCreateAppSettings(shop);
@@ -164,7 +126,7 @@ export async function getAuthorizedSources(shop: string): Promise<string[]> {
 }
 
 /**
- * Vérifie si une source est autorisée
+ * Check if a source is authorized
  */
 export async function isSourceAuthorized(
   shop: string,
@@ -175,43 +137,31 @@ export async function isSourceAuthorized(
 }
 
 /**
- * Obtient le plan actuel avec ses limites
+ * Update default organization settings
  */
-export async function getCurrentPlanWithLimits(shop: string): Promise<{
-  plan: string;
-  limits: (typeof BILLING_PLANS)[keyof typeof BILLING_PLANS];
-}> {
-  const settings = await getOrCreateAppSettings(shop);
-  const planKey = settings.currentPlan.toUpperCase() as keyof typeof BILLING_PLANS;
+export async function updateDefaultOrganization(
+  shop: string,
+  defaultCollectionId?: string | null,
+  defaultTags?: string | null,
+  autoPublish?: boolean,
+): Promise<AppSettings> {
+  await getOrCreateAppSettings(shop);
 
-  return {
-    plan: settings.currentPlan,
-    limits: BILLING_PLANS[planKey] || BILLING_PLANS.FREE,
-  };
+  return prisma.appSettings.update({
+    where: { shop },
+    data: {
+      defaultCollectionId: defaultCollectionId || null,
+      defaultTags: defaultTags || null,
+      autoPublish: autoPublish || false,
+    },
+  });
 }
 
 /**
- * Vérifie si la boutique peut importer plus de produits
+ * Get product count for a shop (no limits in free version)
  */
-export async function canImportMoreProducts(shop: string): Promise<{
-  canImport: boolean;
-  currentCount: number;
-  maxProducts: number;
-  planName: string;
-}> {
-  const { plan, limits } = await getCurrentPlanWithLimits(shop);
-
-  const currentCount = await prisma.importedProduct.count({
+export async function getProductCount(shop: string): Promise<number> {
+  return prisma.importedProduct.count({
     where: { shop },
   });
-
-  const canImport =
-    limits.maxProducts === -1 || currentCount < limits.maxProducts;
-
-  return {
-    canImport,
-    currentCount,
-    maxProducts: limits.maxProducts,
-    planName: limits.name,
-  };
 }

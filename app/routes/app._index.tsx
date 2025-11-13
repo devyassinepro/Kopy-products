@@ -1,31 +1,38 @@
 /**
- * Page principale : Import et édition de produits
- * Interface complète avec tous les champs modifiables
+ * Main page: Product import and editing
+ * Complete interface with all editable fields
  */
 
 import { useState, useEffect } from "react";
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { getOrCreateAppSettings, canImportMoreProducts } from "../models/app-settings.server";
-import { calculateUsagePercentage } from "../utils/formatters";
+import { getOrCreateAppSettings, getProductCount } from "../models/app-settings.server";
 import type { SourceProduct } from "../utils/types";
+import TermsBlocker from "../components/TermsBlocker";
+import ProductCardList from "../components/ProductCardList";
+import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Récupérer les paramètres et limites
+  // Get settings
   const settings = await getOrCreateAppSettings(shop);
-  const limits = await canImportMoreProducts(shop);
-  const usagePercentage = calculateUsagePercentage(
-    limits.currentCount,
-    limits.maxProducts,
-  );
+  const currentCount = await getProductCount(shop);
 
-  // Récupérer les collections
+  // No limits - free application
+  const limits = {
+    canImport: true,
+    currentCount: currentCount,
+    maxProducts: -1, // unlimited
+    planName: "Free",
+    usagePercentage: 0, // no limit so 0%
+  };
+
+  // Get collections
   const collectionsResponse = await admin.graphql(
     `#graphql
     query getCollections {
@@ -46,26 +53,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     title: edge.node.title,
   }));
 
+  // Get 5 most recent imported products
+  const recentProducts = await prisma.importedProduct.findMany({
+    where: { shop: session.shop },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
   return Response.json({
     settings: {
       defaultPricingMode: settings.defaultPricingMode,
       defaultMarkupAmount: settings.defaultMarkupAmount,
       defaultMultiplier: settings.defaultMultiplier,
+      termsAccepted: settings.termsAccepted,
     },
     limits: {
       canImport: limits.canImport,
       currentCount: limits.currentCount,
       maxProducts: limits.maxProducts,
       planName: limits.planName,
-      usagePercentage,
+      usagePercentage: limits.usagePercentage,
     },
     collections,
+    recentProducts,
+    shop: session.shop,
   });
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const actionType = formData.get("action");
+
+  if (actionType === "acceptTerms") {
+    await prisma.appSettings.update({
+      where: { shop: session.shop },
+      data: {
+        termsAccepted: true,
+        termsAcceptedAt: new Date(),
+      },
+    });
+    return Response.json({ success: true, action: "termsAccepted" });
+  }
+
+  return Response.json({ error: "Invalid action" }, { status: 400 });
+};
+
 export default function ImportProduct() {
-  const { settings, limits, collections } = useLoaderData<typeof loader>();
+  const { settings, limits, collections, recentProducts, shop } = useLoaderData<typeof loader>();
   const shopify = useAppBridge();
+  const fetcher = useFetcher<typeof action>();
 
   // Fetchers
   const fetchProductFetcher = useFetcher();
@@ -86,7 +123,13 @@ export default function ImportProduct() {
   const [editedVariants, setEditedVariants] = useState<any[]>([]);
 
   // State - Pricing
-  const [pricingMode, setPricingMode] = useState(settings.defaultPricingMode);
+  // Convert legacy pricing modes to new format
+  const initialPricingMode = settings.defaultPricingMode === "markup"
+    ? "increase-dollar"
+    : settings.defaultPricingMode === "multiplier"
+    ? "increase-percent"
+    : settings.defaultPricingMode;
+  const [pricingMode, setPricingMode] = useState(initialPricingMode);
   const [markupAmount, setMarkupAmount] = useState(settings.defaultMarkupAmount.toString());
   const [multiplier, setMultiplier] = useState(settings.defaultMultiplier.toString());
   const [applyToAll, setApplyToAll] = useState(true);
@@ -98,6 +141,8 @@ export default function ImportProduct() {
   // State - UI
   const [showPreview, setShowPreview] = useState(false);
   const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
+  const [showTermsBlocker, setShowTermsBlocker] = useState(!settings.termsAccepted);
+  const [hasPermission, setHasPermission] = useState(settings.termsAccepted);
 
   // Loading states
   const isFetchingPreview =
@@ -107,7 +152,7 @@ export default function ImportProduct() {
     importProductFetcher.state === "submitting" ||
     importProductFetcher.state === "loading";
 
-  // Gérer la réponse du fetch
+  // Handle fetch response
   useEffect(() => {
     if (fetchProductFetcher.data?.success && fetchProductFetcher.data?.product) {
       const product = fetchProductFetcher.data.product;
@@ -121,16 +166,16 @@ export default function ImportProduct() {
       setEditedImages(product.images || []);
       setEditedVariants(product.variants || []);
       setShowPreview(true);
-      shopify.toast.show("Produit chargé avec succès !");
+      shopify.toast.show("Product loaded successfully!");
     } else if (fetchProductFetcher.data?.error) {
       shopify.toast.show(fetchProductFetcher.data.error, { isError: true });
     }
   }, [fetchProductFetcher.data, shopify]);
 
-  // Gérer la réponse de l'import
+  // Handle import response
   useEffect(() => {
     if (importProductFetcher.data?.success) {
-      shopify.toast.show("Produit importé avec succès !");
+      shopify.toast.show("Product imported successfully!");
       // Reset
       setProductUrl("");
       setProductData(null);
@@ -140,10 +185,24 @@ export default function ImportProduct() {
     }
   }, [importProductFetcher.data, shopify]);
 
-  // Fonctions
+  // Handle terms acceptance
+  useEffect(() => {
+    if (fetcher.data?.action === "termsAccepted") {
+      setShowTermsBlocker(false);
+      setHasPermission(true);
+      shopify.toast.show("Terms accepted successfully!");
+    }
+  }, [fetcher.data, shopify]);
+
+  // Functions
   const handleFetchProduct = () => {
     if (!productUrl.trim()) {
-      shopify.toast.show("Veuillez entrer une URL", { isError: true });
+      shopify.toast.show("Please enter a URL", { isError: true });
+      return;
+    }
+
+    if (!hasPermission) {
+      shopify.toast.show("You must confirm you have permission to clone this product", { isError: true });
       return;
     }
 
@@ -158,26 +217,30 @@ export default function ImportProduct() {
 
   const handleImportProduct = () => {
     if (!productData) {
-      shopify.toast.show("Veuillez d'abord charger un produit", { isError: true });
+      shopify.toast.show("Please load a product first", { isError: true });
       return;
     }
 
-    if (!limits.canImport) {
-      shopify.toast.show(
-        `Limite atteinte pour votre plan ${limits.planName}`,
-        { isError: true },
-      );
-      return;
-    }
-
-    // Appliquer les prix modifiés aux variants
+    // Apply modified prices to variants
     const finalVariants = editedVariants.map((variant) => {
       let finalPrice = parseFloat(variant.price);
 
       if (applyToAll) {
-        if (pricingMode === "markup") {
+        if (pricingMode === "increase-dollar") {
+          finalPrice = finalPrice + parseFloat(markupAmount || "0");
+        } else if (pricingMode === "decrease-dollar") {
+          finalPrice = Math.max(0, finalPrice - parseFloat(markupAmount || "0"));
+        } else if (pricingMode === "increase-percent") {
+          const percent = parseFloat(multiplier || "0");
+          finalPrice = finalPrice * (1 + percent / 100);
+        } else if (pricingMode === "decrease-percent") {
+          const percent = parseFloat(multiplier || "0");
+          finalPrice = Math.max(0, finalPrice * (1 - percent / 100));
+        } else if (pricingMode === "markup") {
+          // Legacy mode
           finalPrice = finalPrice + parseFloat(markupAmount || "0");
         } else {
+          // Legacy multiplier mode
           finalPrice = finalPrice * parseFloat(multiplier || "1");
         }
       }
@@ -188,7 +251,7 @@ export default function ImportProduct() {
       };
     });
 
-    // Construire le produit final avec toutes les modifications
+    // Build final product with all modifications
     const finalProduct: SourceProduct = {
       ...productData,
       title: editedTitle,
@@ -201,12 +264,26 @@ export default function ImportProduct() {
       variants: finalVariants,
     };
 
+    // Convert new pricing modes to legacy format for server
+    const legacyPricingMode =
+      pricingMode === "increase-dollar" || pricingMode === "decrease-dollar"
+        ? "markup"
+        : "multiplier";
+    const adjustedMarkupAmount = pricingMode === "decrease-dollar"
+      ? (parseFloat(markupAmount) * -1).toString()
+      : markupAmount;
+    const adjustedMultiplier = pricingMode === "increase-percent"
+      ? (1 + parseFloat(multiplier) / 100).toString()
+      : pricingMode === "decrease-percent"
+      ? (1 - parseFloat(multiplier) / 100).toString()
+      : multiplier;
+
     const formData = new FormData();
     formData.append("productData", JSON.stringify(finalProduct));
     formData.append("sourceUrl", productUrl);
-    formData.append("pricingMode", pricingMode);
-    formData.append("markupAmount", markupAmount);
-    formData.append("multiplier", multiplier);
+    formData.append("pricingMode", legacyPricingMode);
+    formData.append("markupAmount", adjustedMarkupAmount);
+    formData.append("multiplier", adjustedMultiplier);
     formData.append("status", productStatus);
     formData.append("collectionId", selectedCollection);
 
@@ -218,6 +295,20 @@ export default function ImportProduct() {
 
   const calculatePreviewPrice = (price: string) => {
     const priceNum = parseFloat(price);
+
+    if (pricingMode === "increase-dollar") {
+      return (priceNum + parseFloat(markupAmount || "0")).toFixed(2);
+    } else if (pricingMode === "decrease-dollar") {
+      return Math.max(0, priceNum - parseFloat(markupAmount || "0")).toFixed(2);
+    } else if (pricingMode === "increase-percent") {
+      const percent = parseFloat(multiplier || "0");
+      return (priceNum * (1 + percent / 100)).toFixed(2);
+    } else if (pricingMode === "decrease-percent") {
+      const percent = parseFloat(multiplier || "0");
+      return Math.max(0, priceNum * (1 - percent / 100)).toFixed(2);
+    }
+
+    // Fallback for legacy modes
     if (pricingMode === "markup") {
       return (priceNum + parseFloat(markupAmount || "0")).toFixed(2);
     } else {
@@ -254,9 +345,21 @@ export default function ImportProduct() {
       const originalPrice = parseFloat(variant.price);
       let newPrice = originalPrice;
 
-      if (pricingMode === "markup") {
+      if (pricingMode === "increase-dollar") {
+        newPrice = originalPrice + parseFloat(markupAmount || "0");
+      } else if (pricingMode === "decrease-dollar") {
+        newPrice = Math.max(0, originalPrice - parseFloat(markupAmount || "0"));
+      } else if (pricingMode === "increase-percent") {
+        const percent = parseFloat(multiplier || "0");
+        newPrice = originalPrice * (1 + percent / 100);
+      } else if (pricingMode === "decrease-percent") {
+        const percent = parseFloat(multiplier || "0");
+        newPrice = Math.max(0, originalPrice * (1 - percent / 100));
+      } else if (pricingMode === "markup") {
+        // Legacy mode
         newPrice = originalPrice + parseFloat(markupAmount || "0");
       } else {
+        // Legacy multiplier mode
         newPrice = originalPrice * parseFloat(multiplier || "1");
       }
 
@@ -264,7 +367,7 @@ export default function ImportProduct() {
     });
 
     setEditedVariants(newVariants);
-    shopify.toast.show("Prix appliqués à tous les variants !");
+    shopify.toast.show("Prices applied to all variants!");
   };
 
   const handleIncreaseAllPrices = () => {
@@ -282,7 +385,7 @@ export default function ImportProduct() {
     });
 
     setEditedVariants(newVariants);
-    shopify.toast.show(`Prix augmentés !`);
+    shopify.toast.show(`Prices increased!`);
   };
 
   const handleDecreaseAllPrices = () => {
@@ -300,79 +403,68 @@ export default function ImportProduct() {
     });
 
     setEditedVariants(newVariants);
-    shopify.toast.show(`Prix diminués !`);
+    shopify.toast.show(`Prices decreased!`);
+  };
+
+  const handleAcceptTerms = () => {
+    const formData = new FormData();
+    formData.append("action", "acceptTerms");
+    fetcher.submit(formData, { method: "POST" });
   };
 
   return (
-    <s-page heading="Importer un produit">
-      <s-link slot="back-action" href="/app" />
+    <>
+      <TermsBlocker show={showTermsBlocker} onAccept={handleAcceptTerms} />
+      <s-page heading="Import a product">
+        <s-link slot="back-action" href="/app" />
 
-      {/* Limites du plan */}
-      {limits.usagePercentage >= 80 && (
-        <s-banner
-          tone={limits.usagePercentage >= 100 ? "critical" : "warning"}
-          slot="banner"
-        >
-          <s-paragraph>
-            Vous avez utilisé {limits.currentCount} /{" "}
-            {limits.maxProducts === -1 ? "∞" : limits.maxProducts} produits de
-            votre plan {limits.planName}.
-            {!limits.canImport && " Veuillez upgrader votre plan pour continuer."}
-          </s-paragraph>
-        </s-banner>
-      )}
-
-      {/* Section 1: URL et fetch */}
-      <s-section heading="1. URL du produit source">
+      {/* Section 1: URL and fetch */}
+      <s-section heading="1. Source product URL">
         <s-stack direction="block" gap="base">
           <s-paragraph>
-            Collez l'URL d'un produit Shopify que vous souhaitez importer dans
-            votre boutique.
+            Paste the URL of a Shopify product that you want to import into
+            your store.
           </s-paragraph>
 
-          <s-banner tone="info">
+          {/* <s-banner tone="info">
             <s-paragraph>
-              L'URL est utilisée pour récupérer toutes les données du produit (titre, description, images, variants, etc.).
-              Une fois chargé, vous pourrez modifier tous les champs avant l'import.
+              The URL is used to retrieve all product data (title, description, images, variants, etc.).
+              Once loaded, you can modify all fields before importing.
             </s-paragraph>
-          </s-banner>
+          </s-banner> */}
 
           <s-text-field
-            label="URL du produit Shopify"
+            label="Shopify product URL"
             value={productUrl}
             onChange={(e: any) => setProductUrl(e.target.value)}
-            placeholder="https://example.myshopify.com/products/mon-produit"
+            placeholder="https://example.com/products/product-name"
           />
 
-          <s-button onClick={handleFetchProduct} {...(isFetchingPreview ? { loading: true } : {})}>
-            {isFetchingPreview ? "Chargement..." : "Charger le produit"}
+          <s-checkbox
+            checked={hasPermission}
+            label="I have permission to clone this product"
+            onChange={(e: any) => setHasPermission(e.target.checked)}
+          ></s-checkbox>
+
+          <s-button
+            onClick={handleFetchProduct}
+            {...(isFetchingPreview ? { loading: true } : {})}
+            {...(!hasPermission ? { disabled: true } : {})}
+          >
+            {isFetchingPreview ? "Loading..." : "Import product"}
           </s-button>
         </s-stack>
       </s-section>
 
-      {/* Section 2: Édition des informations de base */}
+      {/* Section 2: Basic information editing */}
       {showPreview && productData && (
         <>
-          <s-section heading="2. Informations du produit">
+          <s-section heading="2. Product information">
             <s-stack direction="block" gap="base">
               <s-text-field
-                label="Titre du produit"
+                label="Product title"
                 value={editedTitle}
                 onChange={(e: any) => setEditedTitle(e.target.value)}
-              />
-
-              <s-text-field
-                label="Vendor"
-                value={editedVendor}
-                onChange={(e: any) => setEditedVendor(e.target.value)}
-                helptext="Nom du fournisseur ou de la marque"
-              />
-
-              <s-text-field
-                label="Type de produit"
-                value={editedProductType}
-                onChange={(e: any) => setEditedProductType(e.target.value)}
-                helptext="Catégorie du produit"
               />
 
               {/* Description */}
@@ -382,13 +474,22 @@ export default function ImportProduct() {
                 </label>
 
                 {!showDescriptionEditor ? (
-                  <div>
-                    <s-paragraph>
-                      {editedDescription.substring(0, 200)}
-                      {editedDescription.length > 200 && "..."}
-                    </s-paragraph>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div
+                      style={{
+                        padding: "12px",
+                        border: "1px solid #e1e3e5",
+                        borderRadius: "8px",
+                        backgroundColor: "#f6f6f7",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: editedDescriptionHtml || editedDescription,
+                      }}
+                    />
                     <s-button onClick={() => setShowDescriptionEditor(true)}>
-                      Modifier la description
+                      Edit description
                     </s-button>
                   </div>
                 ) : (
@@ -411,24 +512,38 @@ export default function ImportProduct() {
                         fontFamily: "monospace",
                         resize: "vertical",
                       }}
-                      placeholder="<p>Description HTML...</p>"
+                      placeholder="<p>HTML description...</p>"
                     />
                     <s-stack direction="inline" gap="small">
                       <s-button onClick={() => setShowDescriptionEditor(false)}>
-                        Fermer l'éditeur
+                        Close editor
                       </s-button>
                       <s-text size="small" tone="subdued">
-                        Vous pouvez utiliser du HTML (p, strong, ul, li, etc.)
+                        You can use HTML (p, strong, ul, li, etc.)
                       </s-text>
                     </s-stack>
                   </div>
                 )}
               </div>
 
+              <s-text-field
+                label="Vendor"
+                value={editedVendor}
+                onChange={(e: any) => setEditedVendor(e.target.value)}
+                helptext="Supplier or brand name"
+              />
+
+              <s-text-field
+                label="Product type"
+                value={editedProductType}
+                onChange={(e: any) => setEditedProductType(e.target.value)}
+                helptext="Product category"
+              />
+
               {/* Tags */}
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
-                  Tags (séparés par des virgules)
+                  Tags (comma separated)
                 </label>
                 <input
                   type="text"
@@ -449,11 +564,11 @@ export default function ImportProduct() {
             </s-stack>
           </s-section>
 
-          {/* Section 3: Gestion des images */}
-          <s-section heading="3. Images du produit">
+          {/* Section 3: Image management */}
+          <s-section heading="3. Product images">
             <s-stack direction="block" gap="base">
               <s-paragraph>
-                Gérez les images de votre produit. Vous pouvez supprimer ou réordonner les images.
+                Manage your product images. You can remove or reorder images.
               </s-paragraph>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -482,7 +597,7 @@ export default function ImportProduct() {
                     <div style={{ flex: 1 }}>
                       <s-text fontWeight="bold">Image {index + 1}</s-text>
                       {index === 0 && (
-                        <s-badge tone="success">Image principale</s-badge>
+                        <s-badge tone="success">Main image</s-badge>
                       )}
                     </div>
                     <s-stack direction="inline" gap="small">
@@ -525,7 +640,7 @@ export default function ImportProduct() {
                           cursor: "pointer",
                         }}
                       >
-                        🗑️ Supprimer
+                        🗑️ Remove
                       </button>
                     </s-stack>
                   </div>
@@ -534,70 +649,125 @@ export default function ImportProduct() {
 
               {editedImages.length === 0 && (
                 <s-banner tone="warning">
-                  <s-paragraph>Aucune image disponible pour ce produit.</s-paragraph>
+                  <s-paragraph>No images available for this product.</s-paragraph>
                 </s-banner>
               )}
             </s-stack>
           </s-section>
 
-          {/* Section 4: Configuration du pricing */}
-          <s-section heading="4. Configuration du pricing">
+          {/* Section 4: Pricing configuration */}
+          <s-section heading="4. Pricing configuration">
             <s-stack direction="block" gap="base">
-              <s-choice-list
-                label="Mode de pricing"
-                value={pricingMode}
-                onChange={(e: any) => setPricingMode(e.target.value)}
-              >
-                <s-radio value="markup">
-                  Markup fixe (ajouter un montant aux prix)
-                </s-radio>
-                <s-radio value="multiplier">
-                  Multiplicateur (multiplier les prix)
-                </s-radio>
-              </s-choice-list>
+              {/* Direction: Increase or Decrease */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+                  Price adjustment direction
+                </label>
+                <s-stack direction="inline" gap="base">
+                  <s-checkbox
+                    checked={pricingMode.startsWith("increase")}
+                    onChange={(e: any) => {
+                      if (e.target.checked) {
+                        setPricingMode(
+                          pricingMode.includes("dollar")
+                            ? "increase-dollar"
+                            : pricingMode.includes("percent")
+                            ? "increase-percent"
+                            : "increase-dollar"
+                        );
+                      }
+                    }}
+                    label="⬆️ Increase prices"
+                  />
+                  <s-checkbox
+                    checked={pricingMode.startsWith("decrease")}
+                    onChange={(e: any) => {
+                      if (e.target.checked) {
+                        setPricingMode(
+                          pricingMode.includes("dollar")
+                            ? "decrease-dollar"
+                            : pricingMode.includes("percent")
+                            ? "decrease-percent"
+                            : "decrease-dollar"
+                        );
+                      }
+                    }}
+                    label="⬇️ Decrease prices"
+                  />
+                </s-stack>
+              </div>
 
-              {pricingMode === "markup" && (
+              {/* Type: Dollar or Percentage */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+                  Adjustment type
+                </label>
+                <s-stack direction="inline" gap="base">
+                  <s-checkbox
+                    checked={pricingMode.includes("dollar")}
+                    onChange={(e: any) => {
+                      if (e.target.checked) {
+                        setPricingMode(
+                          pricingMode.startsWith("increase")
+                            ? "increase-dollar"
+                            : "decrease-dollar"
+                        );
+                      }
+                    }}
+                    label="💵 Dollar amount"
+                  />
+                  <s-checkbox
+                    checked={pricingMode.includes("percent")}
+                    onChange={(e: any) => {
+                      if (e.target.checked) {
+                        setPricingMode(
+                          pricingMode.startsWith("increase")
+                            ? "increase-percent"
+                            : "decrease-percent"
+                        );
+                      }
+                    }}
+                    label="📊 Percentage"
+                  />
+                </s-stack>
+              </div>
+
+              {/* Input field based on type */}
+              {(pricingMode === "increase-dollar" || pricingMode === "decrease-dollar") && (
                 <s-text-field
                   type="number"
-                  label="Montant du markup (€)"
+                  label={`Dollar amount ($)`}
                   value={markupAmount}
                   onChange={(e: any) => setMarkupAmount(e.target.value)}
-                  helptext="Exemple: 10 pour ajouter 10€ à chaque prix"
+                  helptext={`Amount to ${pricingMode === "increase-dollar" ? "add to" : "subtract from"} each price`}
                   step="0.01"
+                  min="0"
                 />
               )}
 
-              {pricingMode === "multiplier" && (
+              {(pricingMode === "increase-percent" || pricingMode === "decrease-percent") && (
                 <s-text-field
                   type="number"
-                  label="Multiplicateur"
+                  label={`Percentage (%)`}
                   value={multiplier}
                   onChange={(e: any) => setMultiplier(e.target.value)}
-                  helptext="Exemple: 1.5 pour augmenter les prix de 50%"
+                  helptext={`Percentage to ${pricingMode === "increase-percent" ? "increase" : "decrease"} prices`}
                   step="0.01"
-                  min="0.1"
+                  min="0"
                 />
               )}
 
-              <s-stack direction="inline" gap="base">
-                <s-button variant="primary" onClick={handleIncreaseAllPrices}>
-                  ⬆️ Augmenter tous les prix
-                </s-button>
-                <s-button onClick={handleDecreaseAllPrices}>
-                  ⬇️ Diminuer tous les prix
-                </s-button>
-                <s-button onClick={handleApplyPricingToAll}>
-                  Appliquer à tous
-                </s-button>
-              </s-stack>
+              <s-button variant="primary" onClick={handleApplyPricingToAll}>
+                Apply pricing to all variants
+              </s-button>
             </s-stack>
           </s-section>
 
-          {/* Section 5: Gestion des variants */}
-          <s-section heading="5. Variants et prix">
+          {/* Section 5: Variant management */}
+          <s-section heading="5. Variants and prices">
             <s-stack direction="block" gap="base">
               <s-paragraph>
-                Modifiez les prix de chaque variant individuellement si nécessaire.
+                Modify the prices of each variant individually if needed.
               </s-paragraph>
 
               <s-data-table>
@@ -605,8 +775,8 @@ export default function ImportProduct() {
                   <thead>
                     <tr>
                       <th>Variant</th>
-                      <th>Prix actuel</th>
-                      <th>Aperçu nouveau prix</th>
+                      <th>Current price</th>
+                      <th>New price preview</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -645,21 +815,38 @@ export default function ImportProduct() {
             </s-stack>
           </s-section>
 
-          {/* Section 6: Options de publication */}
-          <s-section heading="6. Options de publication">
+          {/* Section 6: Publishing options */}
+          <s-section heading="6. Publishing options">
             <s-stack direction="block" gap="base">
-              <s-choice-list
-                label="Statut du produit"
-                value={productStatus}
-                onChange={(e: any) => setProductStatus(e.target.value)}
-              >
-                <s-radio value="ACTIVE">Actif (publié)</s-radio>
-                <s-radio value="DRAFT">Brouillon</s-radio>
-              </s-choice-list>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+                  Product status
+                </label>
+                <s-stack direction="inline" gap="base">
+                  <s-checkbox
+                    checked={productStatus === "ACTIVE"}
+                    onChange={(e: any) => {
+                      if (e.target.checked) {
+                        setProductStatus("ACTIVE");
+                      }
+                    }}
+                    label="Active (published)"
+                  />
+                  <s-checkbox
+                    checked={productStatus === "DRAFT"}
+                    onChange={(e: any) => {
+                      if (e.target.checked) {
+                        setProductStatus("DRAFT");
+                      }
+                    }}
+                    label="Draft"
+                  />
+                </s-stack>
+              </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 <label htmlFor="selectedCollection" style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
-                  Collection (optionnel)
+                  Collection (optional)
                 </label>
                 <select
                   id="selectedCollection"
@@ -674,7 +861,7 @@ export default function ImportProduct() {
                     cursor: "pointer",
                   }}
                 >
-                  <option value="">-- Aucune collection --</option>
+                  <option value="">-- No collection --</option>
                   {collections && collections.length > 0 ? (
                     collections.map((c: any) => (
                       <option key={c.id} value={c.id}>
@@ -687,54 +874,60 @@ export default function ImportProduct() {
 
               <s-stack direction="inline" gap="base">
                 <s-button onClick={() => setShowPreview(false)}>
-                  Annuler
+                  Cancel
                 </s-button>
                 <s-button
                   variant="primary"
                   onClick={handleImportProduct}
                   {...(isImporting ? { loading: true } : {})}
-                  {...(!limits.canImport ? { disabled: true } : {})}
                 >
-                  {isImporting ? "Import en cours..." : "Importer ce produit"}
+                  {isImporting ? "Importing..." : "Import this product"}
                 </s-button>
               </s-stack>
-
-              {!limits.canImport && (
-                <s-banner tone="warning">
-                  <s-paragraph>
-                    Vous avez atteint la limite de votre plan. Veuillez upgrader
-                    pour continuer.
-                  </s-paragraph>
-                </s-banner>
-              )}
             </s-stack>
           </s-section>
         </>
       )}
 
       {/* Section aside: Guide */}
-      <s-section slot="aside" heading="Guide d'utilisation">
+      <s-section slot="aside" heading="Usage guide">
         <s-ordered-list>
-          <s-list-item>Copiez l'URL d'un produit Shopify</s-list-item>
-          <s-list-item>Cliquez sur "Charger le produit"</s-list-item>
-          <s-list-item>Modifiez le titre, description, images</s-list-item>
-          <s-list-item>Configurez vos prix (individuel ou global)</s-list-item>
-          <s-list-item>Choisissez le statut et la collection</s-list-item>
-          <s-list-item>Importez le produit dans votre boutique</s-list-item>
+          <s-list-item>Copy the URL of a Shopify product</s-list-item>
+          <s-list-item>Click "Import product"</s-list-item>
+          <s-list-item>Edit the title, description, images</s-list-item>
+          <s-list-item>Configure your prices (individual or global)</s-list-item>
+          <s-list-item>Choose the status and collection</s-list-item>
+          <s-list-item>Import the product into your store</s-list-item>
         </s-ordered-list>
       </s-section>
 
-      <s-section slot="aside" heading="Plan actuel">
+      {/* <s-section slot="aside" heading="Current plan">
         <s-paragraph>
           <s-text fontWeight="bold">{limits.planName}</s-text>
         </s-paragraph>
         <s-paragraph>
-          {limits.currentCount} / {limits.maxProducts === -1 ? "∞" : limits.maxProducts}{" "}
-          produits utilisés
+          {limits.currentCount} products imported
         </s-paragraph>
-        <s-link href="/app/billing">Voir les plans</s-link>
-      </s-section>
+        <s-banner tone="success">
+          <s-paragraph>All products are free!</s-paragraph>
+        </s-banner>
+      </s-section> */}
+
+      {/* Section: Recent Products */}
+      {recentProducts && recentProducts.length > 0 && (
+        <s-section heading="📦 Recently imported products">
+          <s-stack direction="block" gap="base">
+            <s-paragraph tone="subdued">
+              Here are the 5 most recent products you imported
+            </s-paragraph>
+            {recentProducts.map((product) => (
+              <ProductCardList key={product.id} product={product} shop={shop} />
+            ))}
+          </s-stack>
+        </s-section>
+      )}
     </s-page>
+    </>
   );
 }
 

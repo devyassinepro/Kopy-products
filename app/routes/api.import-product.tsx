@@ -6,8 +6,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { importProduct } from "../services/product-importer.server";
-import { canImportMoreProducts } from "../models/app-settings.server";
-import { ERROR_MESSAGES } from "../utils/constants";
 import type { PricingConfig, SourceProduct } from "../utils/types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -40,19 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       multiplier: multiplier ? parseFloat(multiplier as string) : undefined,
     };
 
-    // Vérifier les limites du plan
-    const limits = await canImportMoreProducts(shop);
-    if (!limits.canImport) {
-      return Response.json(
-        {
-          success: false,
-          error: `${ERROR_MESSAGES.PRODUCT_LIMIT_REACHED}. Plan actuel: ${limits.planName} (${limits.currentCount}/${limits.maxProducts})`,
-        },
-        { status: 403 },
-      );
-    }
-
-    // Importer le produit
+    // Importer le produit (no limits - free app)
     const result = await importProduct(
       shop,
       productData,
