@@ -456,9 +456,87 @@ export default function ImportProduct() {
         </s-stack>
       </s-section>
 
-      {/* Section 2: Basic information editing */}
+      {/* Product Import Modal */}
       {showPreview && productData && (
-        <>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            zIndex: 9998,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setShowPreview(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "12px",
+              maxWidth: "1200px",
+              width: "100%",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid #e1e3e5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
+                📦 Configure Product Import
+              </h2>
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "24px",
+                  cursor: "pointer",
+                  padding: "0",
+                  width: "32px",
+                  height: "32px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "6px",
+                  transition: "background-color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f6f6f7";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content - Scrollable */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "24px",
+              }}
+            >
+              <s-stack direction="block" gap="large">
+                {/* Sections go here */}
           <s-section heading="2. Product information">
             <s-stack direction="block" gap="base">
               <s-text-field
@@ -872,21 +950,36 @@ export default function ImportProduct() {
                 </select>
               </div>
 
-              <s-stack direction="inline" gap="base">
-                <s-button onClick={() => setShowPreview(false)}>
-                  Cancel
-                </s-button>
-                <s-button
-                  variant="primary"
-                  onClick={handleImportProduct}
-                  {...(isImporting ? { loading: true } : {})}
-                >
-                  {isImporting ? "Importing..." : "Import this product"}
-                </s-button>
-              </s-stack>
             </s-stack>
           </s-section>
-        </>
+              </s-stack>
+            </div>
+
+            {/* Modal Footer - Sticky */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderTop: "1px solid #e1e3e5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+              }}
+            >
+              <s-button onClick={() => setShowPreview(false)} size="large">
+                Cancel
+              </s-button>
+              <s-button
+                variant="primary"
+                size="large"
+                onClick={handleImportProduct}
+                {...(isImporting ? { loading: true } : {})}
+              >
+                {isImporting ? "Importing..." : "✓ Import this product"}
+              </s-button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Section aside: Guide */}
