@@ -20,5 +20,38 @@ api_version = "2026-01"
 # - read_orders : pour les statistiques et insights (futur)
 scopes = "write_products,read_products"
 
+# App lifecycle webhooks
+[[webhooks.subscriptions]]
+topics = [ "app/uninstalled" ]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = [ "app/scopes_update" ]
+uri = "/webhooks/app/scopes_update"
+
+# Billing webhooks - Auto-upgrade subscriptions
+[[webhooks.subscriptions]]
+topics = [ "app_subscriptions/update" ]
+uri = "/webhooks/app/subscriptions_update"
+
+# GDPR Mandatory Compliance Webhooks
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "/webhooks/gdpr"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products"
+
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://amazonimporter-app-zffzk.ondigitalocean.app/auth/callback",
+  "https://amazonimporter-app-zffzk.ondigitalocean.app/auth/shopify/callback",
+  "https://amazonimporter-app-zffzk.ondigitalocean.app/api/auth/callback"
+]
+
+# Legal URLs for App Store approval  
+privacy_policy_url = "https://amazonimporter-app-zffzk.ondigitalocean.app/privacy-policy"
+terms_of_service_url = "https://amazonimporter-app-zffzk.ondigitalocean.app/terms-of-service"
+support_url = "https://amazonimporter-app-zffzk.ondigitalocean.app/support"
+

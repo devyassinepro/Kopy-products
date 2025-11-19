@@ -22,6 +22,10 @@ export default function App() {
         <s-link href="/app/bulk-import">Bulk Import</s-link>
         <s-link href="/app/history">History</s-link>
         <s-link href="/app/settings">Settings</s-link>
+        <s-link href="/app/support">Support</s-link>
+        <s-link href="/app/privacy">Privacy Policy</s-link>
+        <s-link href="/app/terms">Terms of Service</s-link>
+        <s-link href="/app/gdpr">GDPR</s-link>
         {/* <s-link href="/app/billing">Abonnement</s-link> */}
       </s-app-nav>
       <Outlet />
