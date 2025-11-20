@@ -8,15 +8,16 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  // L'authentification va automatiquement retourner 401 si elle échoue
+  const { topic, shop, payload } = await authenticate.webhook(request);
+
+  console.log("Received GDPR webhook:", topic);
+
+  if (!shop) {
+    throw new Response("Shop is required", { status: 400 });
+  }
+
   try {
-    const { topic, shop, payload } = await authenticate.webhook(request);
-
-    console.log("Received GDPR webhook:", topic);
-
-    if (!shop) {
-      throw new Response("Shop is required", { status: 400 });
-    }
-
     switch (topic) {
       case "CUSTOMERS_DATA_REQUEST": {
         // Demande d'accès aux données du client
