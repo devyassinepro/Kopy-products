@@ -13,10 +13,6 @@ api_version = "2026-01"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-# Kopy Products nécessite ces scopes pour :
-# - read_products : lire les produits sources
-# - write_products : créer/modifier les produits dans la boutique destination
-# - read_orders : pour les statistiques et insights (futur)
 scopes = "write_products,read_products"
 
 # App lifecycle webhooks
