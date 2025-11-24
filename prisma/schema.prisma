@@ -39,6 +39,8 @@ model AppSettings {
   defaultCollectionId  String?           @db.VarChar(255)
   defaultTags          String?           @default("kopy-product") @db.Text
   autoPublish          Boolean           @default(false)
+  priceRoundingEnabled Boolean           @default(false)
+  defaultRoundingValue String?           @default("0.99") @db.VarChar(10)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   importedProducts     ImportedProduct[]

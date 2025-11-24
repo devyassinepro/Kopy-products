@@ -159,6 +159,25 @@ export async function updateDefaultOrganization(
 }
 
 /**
+ * Update price rounding settings
+ */
+export async function updatePriceRounding(
+  shop: string,
+  priceRoundingEnabled: boolean,
+  defaultRoundingValue?: string | null,
+): Promise<AppSettings> {
+  await getOrCreateAppSettings(shop);
+
+  return prisma.appSettings.update({
+    where: { shop },
+    data: {
+      priceRoundingEnabled,
+      defaultRoundingValue: defaultRoundingValue || "0.99",
+    },
+  });
+}
+
+/**
  * Get product count for a shop (no limits in free version)
  */
 export async function getProductCount(shop: string): Promise<number> {

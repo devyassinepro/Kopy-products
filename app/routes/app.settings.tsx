@@ -13,6 +13,7 @@ import {
   updateDefaultPricing,
   updateSyncSettings,
   updateDefaultOrganization,
+  updatePriceRounding,
   addAuthorizedSource,
   removeAuthorizedSource,
   getAuthorizedSources,
@@ -76,6 +77,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       defaultCollectionId: settings.defaultCollectionId,
       defaultTags: settings.defaultTags,
       autoPublish: settings.autoPublish,
+      priceRoundingEnabled: settings.priceRoundingEnabled,
+      defaultRoundingValue: settings.defaultRoundingValue,
       termsAccepted: settings.termsAccepted,
       termsAcceptedAt: settings.termsAcceptedAt?.toISOString() || null,
     },
@@ -153,6 +156,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
       }
 
+      case "updateRounding": {
+        const priceRoundingEnabled = formData.get("priceRoundingEnabled") === "true";
+        const defaultRoundingValue = formData.get("defaultRoundingValue") as string | null;
+
+        await updatePriceRounding(shop, priceRoundingEnabled, defaultRoundingValue);
+
+        return Response.json({
+          success: true,
+          message: "Price rounding settings updated",
+        });
+      }
+
       default:
         return Response.json({ success: false, error: "Invalid action" }, { status: 400 });
     }
@@ -195,6 +210,10 @@ export default function Settings() {
   const initialTags = settings.defaultTags && settings.defaultTags !== "[]" ? settings.defaultTags : "kopy-product";
   const [defaultTags, setDefaultTags] = useState(initialTags);
   const [autoPublish, setAutoPublish] = useState(settings.autoPublish);
+
+  // State for price rounding
+  const [priceRoundingEnabled, setPriceRoundingEnabled] = useState(settings.priceRoundingEnabled);
+  const [defaultRoundingValue, setDefaultRoundingValue] = useState(settings.defaultRoundingValue || "0.99");
 
   // Handle responses
   useEffect(() => {
@@ -263,6 +282,15 @@ export default function Settings() {
     formData.append("defaultCollectionId", defaultCollectionId);
     formData.append("defaultTags", defaultTags);
     formData.append("autoPublish", autoPublish.toString());
+
+    fetcher.submit(formData, { method: "POST" });
+  };
+
+  const handleSaveRounding = () => {
+    const formData = new FormData();
+    formData.append("action", "updateRounding");
+    formData.append("priceRoundingEnabled", priceRoundingEnabled.toString());
+    formData.append("defaultRoundingValue", defaultRoundingValue);
 
     fetcher.submit(formData, { method: "POST" });
   };
@@ -486,7 +514,63 @@ export default function Settings() {
         </s-stack>
       </s-section>
 
-      {/* Section 5: Terms & Conditions */}
+      {/* Section 5: Price Rounding */}
+      <s-section heading="💰 Price rounding">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            Automatically round product prices after applying markup or multiplier.
+          </s-paragraph>
+
+          <s-checkbox
+            checked={priceRoundingEnabled}
+            onChange={(e: any) => setPriceRoundingEnabled(e.target.checked)}
+          >
+            <s-text fontWeight="semibold">Enable price rounding</s-text>
+          </s-checkbox>
+
+          {priceRoundingEnabled && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+                Round prices to
+              </label>
+              <select
+                value={defaultRoundingValue}
+                onChange={(e) => setDefaultRoundingValue(e.target.value)}
+                style={{
+                  padding: "10px 12px",
+                  border: "1px solid #8c9196",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                  outline: "none",
+                  width: "100%",
+                }}
+              >
+                <option value="0.99">X.99 (e.g., 19.99, 29.99)</option>
+                <option value="0.95">X.95 (e.g., 19.95, 29.95)</option>
+                <option value="0.90">X.90 (e.g., 19.90, 29.90)</option>
+                <option value="0.50">X.50 (e.g., 19.50, 29.50)</option>
+                <option value="0.45">X.45 (e.g., 19.45, 29.45)</option>
+                <option value="0.00">X.00 (e.g., 19.00, 29.00)</option>
+              </select>
+              <s-text tone="subdued" size="small">
+                Example: A calculated price of $15.35 will become ${(Math.floor(15.35) + parseFloat(defaultRoundingValue)).toFixed(2)}
+              </s-text>
+            </div>
+          )}
+
+          <s-button
+            variant="primary"
+            onClick={handleSaveRounding}
+            {...(isLoading ? { loading: true } : {})}
+          >
+            Save rounding settings
+          </s-button>
+        </s-stack>
+      </s-section>
+
+      {/* Section 6: Terms & Conditions */}
       <s-section heading="📜 Terms of use">
         <s-stack direction="block" gap="base">
           <s-banner tone="warning">

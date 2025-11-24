@@ -67,6 +67,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       defaultMultiplier: settings.defaultMultiplier,
       termsAccepted: settings.termsAccepted,
       defaultTags: settings.defaultTags,
+      priceRoundingEnabled: settings.priceRoundingEnabled,
+      defaultRoundingValue: settings.defaultRoundingValue,
     },
     limits: {
       canImport: limits.canImport,
@@ -138,6 +140,10 @@ export default function ImportProduct() {
   // State - Publishing
   const [productStatus, setProductStatus] = useState("ACTIVE");
   const [selectedCollection, setSelectedCollection] = useState("");
+
+  // State - Price Rounding
+  const [enableRounding, setEnableRounding] = useState(false);
+  const [roundingValue, setRoundingValue] = useState(settings.defaultRoundingValue || "0.99");
 
   // State - UI
   const [showPreview, setShowPreview] = useState(false);
@@ -228,6 +234,13 @@ export default function ImportProduct() {
     });
   };
 
+  // Helper function to apply price rounding
+  const applyPriceRounding = (price: number, roundTo: string): number => {
+    const integerPart = Math.floor(price);
+    const roundingValue = parseFloat(roundTo);
+    return integerPart + roundingValue;
+  };
+
   const handleImportProduct = () => {
     if (!productData) {
       shopify.toast.show("Please load a product first", { isError: true });
@@ -256,6 +269,11 @@ export default function ImportProduct() {
           // Legacy multiplier mode
           finalPrice = finalPrice * parseFloat(multiplier || "1");
         }
+      }
+
+      // Apply rounding if enabled
+      if (enableRounding) {
+        finalPrice = applyPriceRounding(finalPrice, roundingValue);
       }
 
       return {
@@ -307,26 +325,31 @@ export default function ImportProduct() {
   };
 
   const calculatePreviewPrice = (price: string) => {
-    const priceNum = parseFloat(price);
+    let priceNum = parseFloat(price);
 
     if (pricingMode === "increase-dollar") {
-      return (priceNum + parseFloat(markupAmount || "0")).toFixed(2);
+      priceNum = priceNum + parseFloat(markupAmount || "0");
     } else if (pricingMode === "decrease-dollar") {
-      return Math.max(0, priceNum - parseFloat(markupAmount || "0")).toFixed(2);
+      priceNum = Math.max(0, priceNum - parseFloat(markupAmount || "0"));
     } else if (pricingMode === "increase-percent") {
       const percent = parseFloat(multiplier || "0");
-      return (priceNum * (1 + percent / 100)).toFixed(2);
+      priceNum = priceNum * (1 + percent / 100);
     } else if (pricingMode === "decrease-percent") {
       const percent = parseFloat(multiplier || "0");
-      return Math.max(0, priceNum * (1 - percent / 100)).toFixed(2);
+      priceNum = Math.max(0, priceNum * (1 - percent / 100));
+    } else if (pricingMode === "markup") {
+      // Fallback for legacy modes
+      priceNum = priceNum + parseFloat(markupAmount || "0");
+    } else {
+      priceNum = priceNum * parseFloat(multiplier || "1");
     }
 
-    // Fallback for legacy modes
-    if (pricingMode === "markup") {
-      return (priceNum + parseFloat(markupAmount || "0")).toFixed(2);
-    } else {
-      return (priceNum * parseFloat(multiplier || "1")).toFixed(2);
+    // Apply rounding if enabled
+    if (enableRounding) {
+      priceNum = applyPriceRounding(priceNum, roundingValue);
     }
+
+    return priceNum.toFixed(2);
   };
 
   const handleRemoveImage = (index: number) => {
@@ -967,6 +990,49 @@ export default function ImportProduct() {
               </div>
             </s-stack>
           </s-section>
+
+          {/* Section 7: Price Rounding */}
+          {settings.priceRoundingEnabled && (
+            <s-section heading="7. Price rounding">
+              <s-stack direction="block" gap="base">
+                <s-checkbox
+                  checked={enableRounding}
+                  onChange={(e: any) => setEnableRounding(e.target.checked)}
+                >
+                  Apply price rounding
+                </s-checkbox>
+
+                {enableRounding && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+                      Round prices to
+                    </label>
+                    <select
+                      value={roundingValue}
+                      onChange={(e) => setRoundingValue(e.target.value)}
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #8c9196",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        backgroundColor: "white",
+                        cursor: "pointer",
+                        outline: "none",
+                        width: "100%",
+                      }}
+                    >
+                      <option value="0.99">X.99 (e.g., 19.99, 29.99)</option>
+                      <option value="0.95">X.95 (e.g., 19.95, 29.95)</option>
+                      <option value="0.90">X.90 (e.g., 19.90, 29.90)</option>
+                      <option value="0.50">X.50 (e.g., 19.50, 29.50)</option>
+                      <option value="0.45">X.45 (e.g., 19.45, 29.45)</option>
+                      <option value="0.00">X.00 (e.g., 19.00, 29.00)</option>
+                    </select>
+                  </div>
+                )}
+              </s-stack>
+            </s-section>
+          )}
               </s-stack>
             </div>
 
