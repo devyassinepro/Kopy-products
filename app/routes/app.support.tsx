@@ -10,7 +10,7 @@ export default function Support() {
   return (
     <s-page
       title="Support"
-      subtitle="Get help with Kopy Products"
+      subtitle="Get help with Poky-fy Import & Copy Products"
     >
       <s-layout>
         <s-layout-section>
@@ -19,7 +19,7 @@ export default function Support() {
               <s-text-container>
                 <s-heading>Need Help?</s-heading>
                 <s-text-block>
-                  We're here to help you get the most out of Kopy Products. Below you'll find resources and ways to get support.
+                  We're here to help you get the most out of Poky-fy Import & Copy Products. Below you'll find resources and ways to get support.
                 </s-text-block>
 
                 <s-heading>Frequently Asked Questions</s-heading>

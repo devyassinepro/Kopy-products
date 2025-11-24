@@ -54,7 +54,7 @@ export default function TermsBlocker({ show, onAccept }: TermsBlockerProps) {
               color: "#202223",
             }}
           >
-            Kopy Products - Terms & Conditions
+            Poky-fy Import & Copy Products - Terms & Conditions
           </h2>
         </div>
 
@@ -64,7 +64,7 @@ export default function TermsBlocker({ show, onAccept }: TermsBlockerProps) {
             {/* Introduction */}
             <s-stack direction="block" gap="small">
               <s-text weight="semibold" size="large">
-                By using Kopy Products, you agree to the following terms and conditions:
+                By using Poky-fy Import & Copy Products, you agree to the following terms and conditions:
               </s-text>
               <s-paragraph tone="subdued">
                 <s-unordered-list>

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Production startup script
 
-echo "🚀 Starting Kopy Products in Production..."
+echo "🚀 Starting Poky-fy Import & Copy Products in Production..."
 
 # Generate Prisma Client
 echo "📦 Generating Prisma Client..."

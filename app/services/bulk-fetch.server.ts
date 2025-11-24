@@ -36,7 +36,7 @@ export async function fetchAllProductsFromShop(
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "Kopy Products App",
+          "User-Agent": "Poky-fy Import & Copy Products App",
         },
       });
 

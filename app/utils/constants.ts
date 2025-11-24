@@ -1,5 +1,5 @@
 /**
- * Global constants for Kopy Products
+ * Global constants for Poky-fy Import & Copy Products
  */
 
 // Pricing types

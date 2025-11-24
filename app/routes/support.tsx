@@ -2,8 +2,8 @@ import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Support - Kopy Products" },
-    { name: "description", content: "Support and help for Kopy Products Shopify App" },
+    { title: "Support - Poky-fy Import & Copy Products" },
+    { name: "description", content: "Support and help for Poky-fy Import & Copy Products Shopify App" },
   ];
 };
 
@@ -11,12 +11,12 @@ export default function Support() {
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 20px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>Support</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>Get help with Kopy Products</p>
+      <p style={{ color: "#666", marginBottom: "2rem" }}>Get help with Poky-fy Import & Copy Products</p>
 
       <div style={{ lineHeight: "1.8", color: "#333" }}>
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Need Help?</h2>
         <p>
-          We're here to help you get the most out of Kopy Products. Below you'll find resources and ways to get support.
+          We're here to help you get the most out of Poky-fy Import & Copy Products. Below you'll find resources and ways to get support.
         </p>
 
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Frequently Asked Questions</h2>

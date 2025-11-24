@@ -1,5 +1,5 @@
 /**
- * Fonctions de validation pour Kopy Products
+ * Fonctions de validation pour Poky-fy Import & Copy Products
  */
 
 import {

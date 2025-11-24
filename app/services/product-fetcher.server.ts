@@ -23,7 +23,7 @@ export async function fetchProductFromStorefront(
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "Kopy Products App",
+        "User-Agent": "Poky-fy Import & Copy Products App",
       },
     });
 

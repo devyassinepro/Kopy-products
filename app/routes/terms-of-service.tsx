@@ -2,8 +2,8 @@ import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Terms of Service - Kopy Products" },
-    { name: "description", content: "Terms of Service for Kopy Products Shopify App" },
+    { title: "Terms of Service - Poky-fy Import & Copy Products" },
+    { name: "description", content: "Terms of Service for Poky-fy Import & Copy Products Shopify App" },
   ];
 };
 
@@ -11,16 +11,16 @@ export default function TermsOfService() {
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 20px", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>Terms of Service</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>Terms and conditions for using Kopy Products</p>
+      <p style={{ color: "#666", marginBottom: "2rem" }}>Terms and conditions for using Poky-fy Import & Copy Products</p>
 
       <div style={{ lineHeight: "1.8", color: "#333" }}>
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Agreement to Terms</h2>
         <p>
-          By installing and using Kopy Products, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our application.
+          By installing and using Poky-fy Import & Copy Products, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our application.
         </p>
 
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Description of Service</h2>
-        <p>Kopy Products is a Shopify application that enables merchants to import and manage products from external sources. The service includes:</p>
+        <p>Poky-fy Import & Copy Products is a Shopify application that enables merchants to import and manage products from external sources. The service includes:</p>
         <ul style={{ marginLeft: "2rem", marginBottom: "1rem" }}>
           <li>Product import functionality</li>
           <li>Bulk product operations</li>
@@ -52,7 +52,7 @@ export default function TermsOfService() {
         </ul>
 
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Limitation of Liability</h2>
-        <p>To the maximum extent permitted by law, Kopy Products shall not be liable for:</p>
+        <p>To the maximum extent permitted by law, Poky-fy Import & Copy Products shall not be liable for:</p>
         <ul style={{ marginLeft: "2rem", marginBottom: "1rem" }}>
           <li>Indirect, incidental, or consequential damages</li>
           <li>Loss of profits, data, or business opportunities</li>

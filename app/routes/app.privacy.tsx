@@ -19,7 +19,7 @@ export default function Privacy() {
               <s-text-container>
                 <s-heading>Introduction</s-heading>
                 <s-text-block>
-                  This Privacy Policy describes how Kopy Products ("we", "us", or "our") collects, uses, and shares information when you use our Shopify application.
+                  This Privacy Policy describes how Poky-fy Import & Copy Products ("we", "us", or "our") collects, uses, and shares information when you use our Shopify application.
                 </s-text-block>
 
                 <s-heading>Information We Collect</s-heading>

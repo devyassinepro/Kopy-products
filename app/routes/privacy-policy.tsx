@@ -2,8 +2,8 @@ import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Privacy Policy - Kopy Products" },
-    { name: "description", content: "Privacy Policy for Kopy Products Shopify App" },
+    { title: "Privacy Policy - Poky-fy Import & Copy Products" },
+    { name: "description", content: "Privacy Policy for Poky-fy Import & Copy Products Shopify App" },
   ];
 };
 
@@ -16,7 +16,7 @@ export default function PrivacyPolicy() {
       <div style={{ lineHeight: "1.8", color: "#333" }}>
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Introduction</h2>
         <p>
-          This Privacy Policy describes how Kopy Products ("we", "us", or "our") collects, uses, and shares information when you use our Shopify application.
+          This Privacy Policy describes how Poky-fy Import & Copy Products ("we", "us", or "our") collects, uses, and shares information when you use our Shopify application.
         </p>
 
         <h2 style={{ fontSize: "1.75rem", marginTop: "2rem", marginBottom: "1rem" }}>Information We Collect</h2>

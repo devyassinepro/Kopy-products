@@ -10,7 +10,7 @@ export default function Terms() {
   return (
     <s-page
       title="Terms of Service"
-      subtitle="Terms and conditions for using Kopy Products"
+      subtitle="Terms and conditions for using Poky-fy Import & Copy Products"
     >
       <s-layout>
         <s-layout-section>
@@ -19,12 +19,12 @@ export default function Terms() {
               <s-text-container>
                 <s-heading>Agreement to Terms</s-heading>
                 <s-text-block>
-                  By installing and using Kopy Products, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our application.
+                  By installing and using Poky-fy Import & Copy Products, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our application.
                 </s-text-block>
 
                 <s-heading>Description of Service</s-heading>
                 <s-text-block>
-                  Kopy Products is a Shopify application that enables merchants to import and manage products from external sources. The service includes:
+                  Poky-fy Import & Copy Products is a Shopify application that enables merchants to import and manage products from external sources. The service includes:
                 </s-text-block>
                 <s-list type="bullet">
                   <s-list-item>Product import functionality</s-list-item>
@@ -62,7 +62,7 @@ export default function Terms() {
 
                 <s-heading>Limitation of Liability</s-heading>
                 <s-text-block>
-                  To the maximum extent permitted by law, Kopy Products shall not be liable for:
+                  To the maximum extent permitted by law, Poky-fy Import & Copy Products shall not be liable for:
                 </s-text-block>
                 <s-list type="bullet">
                   <s-list-item>Indirect, incidental, or consequential damages</s-list-item>

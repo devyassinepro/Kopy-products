@@ -1,5 +1,5 @@
 /**
- * Types et interfaces TypeScript pour Kopy Products
+ * Types et interfaces TypeScript pour Poky-fy Import & Copy Products
  */
 
 import type { PRICING_MODES, PRODUCT_STATUS } from "./constants";

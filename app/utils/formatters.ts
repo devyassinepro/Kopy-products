@@ -1,5 +1,5 @@
 /**
- * Fonctions de formatage pour Kopy Products
+ * Fonctions de formatage pour Poky-fy Import & Copy Products
  */
 
 import type { PricingConfig } from "./types";

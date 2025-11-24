@@ -19,7 +19,7 @@ export default function GDPR() {
               <s-text-container>
                 <s-heading>Our Commitment to GDPR</s-heading>
                 <s-text-block>
-                  Kopy Products is committed to protecting your privacy and ensuring compliance with the General Data Protection Regulation (GDPR). This page outlines how we handle your personal data in accordance with GDPR requirements.
+                  Poky-fy Import & Copy Products is committed to protecting your privacy and ensuring compliance with the General Data Protection Regulation (GDPR). This page outlines how we handle your personal data in accordance with GDPR requirements.
                 </s-text-block>
 
                 <s-heading>Legal Basis for Processing</s-heading>
