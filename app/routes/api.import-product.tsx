@@ -24,7 +24,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Validations
     if (!productDataJson || !sourceUrl) {
       return Response.json(
-        { success: false, error: "Données du produit requises" },
+        { success: false, error: "Product data required" },
         { status: 400 },
       );
     }

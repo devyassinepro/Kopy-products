@@ -191,7 +191,9 @@ export default function Settings() {
 
   // State for organization
   const [defaultCollectionId, setDefaultCollectionId] = useState(settings.defaultCollectionId || "");
-  const [defaultTags, setDefaultTags] = useState(settings.defaultTags || "");
+  // Use "kopy-product" as default if tags is empty or "[]"
+  const initialTags = settings.defaultTags && settings.defaultTags !== "[]" ? settings.defaultTags : "kopy-product";
+  const [defaultTags, setDefaultTags] = useState(initialTags);
   const [autoPublish, setAutoPublish] = useState(settings.autoPublish);
 
   // Handle responses
@@ -372,61 +374,6 @@ export default function Settings() {
         </s-stack>
       </s-section>
 
-      {/* Section 3: Authorized source stores */}
-      <s-section heading="Authorized source stores">
-        <s-stack direction="block" gap="base">
-          <s-paragraph>
-            Configure the Shopify stores from which you can import
-            products. Leave empty to allow all stores.
-          </s-paragraph>
-
-          {/* Liste des sources */}
-          {authorizedSources.length > 0 && (
-            <s-stack direction="block" gap="tight">
-              {authorizedSources.map((source) => (
-                <s-stack
-                  key={source}
-                  direction="inline"
-                  gap="base"
-                  style={{
-                    padding: "8px",
-                    border: "1px solid var(--s-color-border)",
-                    borderRadius: "4px",
-                  }}
-                >
-                  <s-text style={{ flex: 1 }}>{source}</s-text>
-                  <s-button
-                    size="small"
-                    variant="tertiary"
-                    onClick={() => handleRemoveSource(source)}
-                    {...(isLoading ? { disabled: true } : {})}
-                  >
-                    Remove
-                  </s-button>
-                </s-stack>
-              ))}
-            </s-stack>
-          )}
-
-          {/* Add a source */}
-          <s-stack direction="inline" gap="base">
-            <s-text-field
-              label="New source store"
-              value={newSource}
-              onChange={(e: any) => setNewSource(e.target.value)}
-              placeholder="example.myshopify.com"
-              helpText="Format: store.myshopify.com or store.com"
-            />
-            <s-button
-              onClick={handleAddSource}
-              {...(isLoading ? { loading: true } : {})}
-            >
-              Add
-            </s-button>
-          </s-stack>
-        </s-stack>
-      </s-section>
-
       {/* Section 4: Product Organization */}
       <s-section heading="📂 Product organization">
         <s-stack direction="block" gap="base">
@@ -434,36 +381,78 @@ export default function Settings() {
             Default configuration for organizing imported products in your store.
           </s-paragraph>
 
-          <s-select
-            label="Default collection"
-            value={defaultCollectionId}
-            onChange={(e: any) => setDefaultCollectionId(e.target.value)}
-            helpText="New products will be automatically added to this collection"
-          >
-            <option value="">-- No default collection --</option>
-            {collections && collections.length > 0 ? (
-              collections.map((c: any) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))
-            ) : null}
-          </s-select>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+              Default collection
+            </label>
+            <select
+              value={defaultCollectionId}
+              onChange={(e) => setDefaultCollectionId(e.target.value)}
+              style={{
+                padding: "10px 12px",
+                border: "1px solid #8c9196",
+                borderRadius: "8px",
+                fontSize: "14px",
+                backgroundColor: "white",
+                cursor: "pointer",
+                outline: "none",
+                width: "100%",
+              }}
+            >
+              <option value="">-- No default collection --</option>
+              {collections && collections.length > 0 &&
+                collections.map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))
+              }
+            </select>
+            <s-text tone="subdued" size="small">
+              New products will be automatically added to this collection
+            </s-text>
+            {collections && collections.length === 0 && (
+              <s-banner tone="info">
+                <s-paragraph size="small">
+                  No collections found in your store. Create a collection in Shopify Admin first to use this feature.
+                </s-paragraph>
+              </s-banner>
+            )}
+          </div>
 
           <s-text-field
             label="Default tags"
             value={defaultTags}
             onChange={(e: any) => setDefaultTags(e.target.value)}
-            placeholder='["tag1", "tag2", "tag3"]'
-            helpText='JSON format: ["tag1", "tag2"] or empty'
+            placeholder="kopy-product, imported, wholesale"
+            helpText="Separate multiple tags with commas. Example: kopy-product, imported, sale"
           />
 
-          <s-checkbox
-            checked={autoPublish}
-            onChange={(e: any) => setAutoPublish(e.target.checked)}
-          >
-            <s-text fontWeight="semibold">Auto-publish imported products</s-text>
-          </s-checkbox>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+              Default product status
+            </label>
+            <select
+              value={autoPublish ? "ACTIVE" : "DRAFT"}
+              onChange={(e) => setAutoPublish(e.target.value === "ACTIVE")}
+              style={{
+                padding: "10px 12px",
+                border: "1px solid #8c9196",
+                borderRadius: "8px",
+                fontSize: "14px",
+                backgroundColor: "white",
+                cursor: "pointer",
+                outline: "none",
+                width: "100%",
+              }}
+            >
+              <option value="ACTIVE">✅ Active (published immediately)</option>
+              <option value="DRAFT">📝 Draft (review before publishing)</option>
+            </select>
+            <s-text tone="subdued" size="small">
+              Choose the default status for newly imported products
+            </s-text>
+          </div>
 
           <s-banner tone={autoPublish ? "warning" : "info"}>
             <s-stack direction="block" gap="tight">

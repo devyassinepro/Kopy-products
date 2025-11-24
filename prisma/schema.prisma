@@ -37,7 +37,7 @@ model AppSettings {
   termsAccepted        Boolean           @default(false)
   termsAcceptedAt      DateTime?
   defaultCollectionId  String?           @db.VarChar(255)
-  defaultTags          String?           @default("[]") @db.Text
+  defaultTags          String?           @default("kopy-product") @db.Text
   autoPublish          Boolean           @default(false)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
@@ -67,8 +67,8 @@ model ImportedProduct {
   settings             AppSettings      @relation(fields: [shop], references: [shop], onDelete: Cascade)
   variants             VariantMapping[]
 
-  @@unique([shop, sourceProductId])
   @@index([shop])
+  @@index([shop, sourceProductId])
   @@index([destinationProductId])
 }
 

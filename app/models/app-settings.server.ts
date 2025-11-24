@@ -28,6 +28,7 @@ export async function getOrCreateAppSettings(
         defaultMultiplier: 1.0,
         autoSyncEnabled: false,
         authorizedSources: "[]",
+        defaultTags: "kopy-product",
       },
     });
   }

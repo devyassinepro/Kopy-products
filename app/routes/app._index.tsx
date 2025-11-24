@@ -66,6 +66,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       defaultMarkupAmount: settings.defaultMarkupAmount,
       defaultMultiplier: settings.defaultMultiplier,
       termsAccepted: settings.termsAccepted,
+      defaultTags: settings.defaultTags,
     },
     limits: {
       canImport: limits.canImport,
@@ -162,7 +163,19 @@ export default function ImportProduct() {
       setEditedDescriptionHtml(product.descriptionHtml);
       setEditedVendor(product.vendor || "");
       setEditedProductType(product.productType || "");
-      setEditedTags(product.tags || []);
+
+      // Merge default tags with product tags
+      const productTags = product.tags || [];
+      const defaultTagsString = settings.defaultTags || "";
+      const defaultTagsArray = defaultTagsString
+        .split(",")
+        .map((t: string) => t.trim())
+        .filter((t: string) => t.length > 0);
+
+      // Combine tags without duplicates
+      const combinedTags = [...new Set([...defaultTagsArray, ...productTags])];
+      setEditedTags(combinedTags);
+
       setEditedImages(product.images || []);
       setEditedVariants(product.variants || []);
       setShowPreview(true);
@@ -170,7 +183,7 @@ export default function ImportProduct() {
     } else if (fetchProductFetcher.data?.error) {
       shopify.toast.show(fetchProductFetcher.data.error, { isError: true });
     }
-  }, [fetchProductFetcher.data, shopify]);
+  }, [fetchProductFetcher.data, shopify, settings.defaultTags]);
 
   // Handle import response
   useEffect(() => {
@@ -202,7 +215,7 @@ export default function ImportProduct() {
     }
 
     if (!hasPermission) {
-      shopify.toast.show("You must confirm you have permission to clone this product", { isError: true });
+      shopify.toast.show("You must confirm you have permission to Import this product", { isError: true });
       return;
     }
 
@@ -442,7 +455,7 @@ export default function ImportProduct() {
 
           <s-checkbox
             checked={hasPermission}
-            label="I have permission to clone this product"
+            label="I have permission to Import this product"
             onChange={(e: any) => setHasPermission(e.target.checked)}
           ></s-checkbox>
 
@@ -896,60 +909,62 @@ export default function ImportProduct() {
           {/* Section 6: Publishing options */}
           <s-section heading="6. Publishing options">
             <s-stack direction="block" gap="base">
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
                   Product status
                 </label>
-                <s-stack direction="inline" gap="base">
-                  <s-checkbox
-                    checked={productStatus === "ACTIVE"}
-                    onChange={(e: any) => {
-                      if (e.target.checked) {
-                        setProductStatus("ACTIVE");
-                      }
-                    }}
-                    label="Active (published)"
-                  />
-                  <s-checkbox
-                    checked={productStatus === "DRAFT"}
-                    onChange={(e: any) => {
-                      if (e.target.checked) {
-                        setProductStatus("DRAFT");
-                      }
-                    }}
-                    label="Draft"
-                  />
-                </s-stack>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <label htmlFor="selectedCollection" style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
-                  Collection (optional)
-                </label>
                 <select
-                  id="selectedCollection"
-                  value={selectedCollection}
-                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  value={productStatus}
+                  onChange={(e) => setProductStatus(e.target.value)}
                   style={{
-                    padding: "8px 12px",
-                    border: "1px solid #c9cccf",
-                    borderRadius: "6px",
+                    padding: "10px 12px",
+                    border: "1px solid #8c9196",
+                    borderRadius: "8px",
                     fontSize: "14px",
                     backgroundColor: "white",
                     cursor: "pointer",
+                    outline: "none",
+                    width: "100%",
+                  }}
+                >
+                  <option value="ACTIVE">Active (published)</option>
+                  <option value="DRAFT">Draft</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#202223" }}>
+                  Collection (optional)
+                </label>
+                <select
+                  value={selectedCollection}
+                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #8c9196",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    backgroundColor: "white",
+                    cursor: "pointer",
+                    outline: "none",
+                    width: "100%",
                   }}
                 >
                   <option value="">-- No collection --</option>
-                  {collections && collections.length > 0 ? (
+                  {collections && collections.length > 0 &&
                     collections.map((c: any) => (
                       <option key={c.id} value={c.id}>
                         {c.title}
                       </option>
                     ))
-                  ) : null}
+                  }
                 </select>
+                {collections && collections.length === 0 && (
+                  <s-text tone="subdued" size="small">
+                    No collections found. Create a collection in Shopify Admin first.
+                  </s-text>
+                )}
               </div>
-
             </s-stack>
           </s-section>
               </s-stack>

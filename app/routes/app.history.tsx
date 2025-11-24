@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useFetcher, useSearchParams } from "react-router";
+import { useLoaderData, useFetcher, useSearchParams, useNavigate } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -115,6 +115,7 @@ export default function History() {
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMode, setFilterMode] = useState<string>("ALL");
@@ -264,20 +265,6 @@ export default function History() {
                 value: `${stats.active} active products`,
                 isPositive: stats.active > stats.draft,
               }}
-            />
-            <StatCard
-              icon="🔄"
-              value={stats.withSyncEnabled}
-              label="With Sync Enabled"
-              colorVariant="purple"
-              delay={300}
-            />
-            <StatCard
-              icon="💰"
-              value={`$${(stats.totalValue || 0).toFixed(0)}`}
-              label="Total Catalog Value"
-              colorVariant="purple"
-              delay={400}
             />
           </div>
         </s-section>
@@ -532,7 +519,7 @@ export default function History() {
               products.length === 0 ? "Import Your First Product" : undefined
             }
             onAction={
-              products.length === 0 ? () => (window.location.href = "/app") : undefined
+              products.length === 0 ? () => navigate("/app") : undefined
             }
           />
         ) : (
@@ -582,9 +569,11 @@ export default function History() {
           >
             <s-button
               disabled={currentPage === 1}
-              onClick={() =>
-                (window.location.href = `/app/history?page=${currentPage - 1}`)
-              }
+              onClick={() => {
+                const newParams = new URLSearchParams(searchParams);
+                newParams.set("page", String(currentPage - 1));
+                setSearchParams(newParams);
+              }}
             >
               ← Previous
             </s-button>
@@ -595,9 +584,11 @@ export default function History() {
 
             <s-button
               disabled={currentPage === totalPages}
-              onClick={() =>
-                (window.location.href = `/app/history?page=${currentPage + 1}`)
-              }
+              onClick={() => {
+                const newParams = new URLSearchParams(searchParams);
+                newParams.set("page", String(currentPage + 1));
+                setSearchParams(newParams);
+              }}
             >
               Next →
             </s-button>
