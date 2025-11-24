@@ -446,8 +446,8 @@ export default function Settings() {
                 width: "100%",
               }}
             >
-              <option value="ACTIVE">✅ Active (published immediately)</option>
-              <option value="DRAFT">📝 Draft (review before publishing)</option>
+              <option value="ACTIVE">Active (published immediately)</option>
+              <option value="DRAFT">Draft (review before publishing)</option>
             </select>
             <s-text tone="subdued" size="small">
               Choose the default status for newly imported products
