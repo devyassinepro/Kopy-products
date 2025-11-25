@@ -24,11 +24,12 @@ export const SYNC_FREQUENCY = {
 
 // Shopify URL validation regex
 export const SHOPIFY_URL_REGEX = {
+  // Accepts all domain formats: .myshopify.com, .com, .fr, .it, .co.uk, .co.nz, etc.
   PRODUCT_URL:
-    /^https?:\/\/([a-zA-Z0-9-]+\.myshopify\.com|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})\/products\/([a-zA-Z0-9-_]+)/,
+    /^https?:\/\/((?:[a-zA-Z0-9-]+\.)+(?:myshopify\.com|[a-zA-Z]{2,}))\/products\/([a-zA-Z0-9-_]+)/,
   ADMIN_PRODUCT_URL:
     /^https?:\/\/admin\.shopify\.com\/store\/([a-zA-Z0-9-]+)\/products\/(\d+)/,
-  SHOP_DOMAIN: /^([a-zA-Z0-9-]+\.myshopify\.com|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})$/,
+  SHOP_DOMAIN: /^((?:[a-zA-Z0-9-]+\.)+(?:myshopify\.com|[a-zA-Z]{2,}))$/,
 } as const;
 
 // Limits and default values
