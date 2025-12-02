@@ -231,6 +231,9 @@ export async function createShopifyProduct(
         const variantInput: any = {
           price: destinationPrice.toString(),
           inventoryPolicy: "CONTINUE",
+          inventoryItem: {
+            tracked: false,
+          },
           optionValues: optionValues,
         };
 
@@ -321,6 +324,9 @@ export async function createShopifyProduct(
                   id: variantId,
                   price: destinationPrice.toString(),
                   inventoryPolicy: "CONTINUE",
+                  inventoryItem: {
+                    tracked: false,
+                  },
                 },
               ],
             },
