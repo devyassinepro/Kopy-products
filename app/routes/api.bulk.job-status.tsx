@@ -45,6 +45,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Parser les erreurs si présentes
     const errors = job.errors ? JSON.parse(job.errors) : [];
 
+    // Parser le progress des produits récents
+    let recentProducts = [];
+    try {
+      recentProducts = job.recentProductProgress
+        ? JSON.parse(job.recentProductProgress)
+        : [];
+    } catch (error) {
+      console.error("Error parsing product progress:", error);
+      recentProducts = [];
+    }
+
     return Response.json({
       success: true,
       job: {
@@ -57,6 +68,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         failedImports: job.failedImports,
         jobStatus: job.jobStatus,
         errors,
+        recentProducts,
         startedAt: job.startedAt,
         completedAt: job.completedAt,
         createdAt: job.createdAt,

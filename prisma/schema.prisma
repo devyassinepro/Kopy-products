@@ -108,6 +108,7 @@ model BulkImportJob {
   failedImports     Int       @default(0)
   jobStatus         String    @default("pending") @db.VarChar(50)
   errors            String?   @default("[]") @db.Text
+  recentProductProgress String? @default("[]") @db.LongText
   startedAt         DateTime?
   completedAt       DateTime?
   createdAt         DateTime  @default(now())

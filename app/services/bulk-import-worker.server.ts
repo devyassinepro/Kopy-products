@@ -9,6 +9,43 @@ import { importProduct } from "./product-importer.server";
 import type { PricingConfig } from "../utils/types";
 
 /**
+ * Helper pour ajouter un produit au progress tracking
+ * Maintient une fenêtre glissante des 50 derniers produits
+ */
+function addProductProgress(
+  currentProgress: string | null,
+  newProduct: {
+    handle: string;
+    title: string;
+    status: "success" | "failed" | "processing";
+    startedAt: string;
+    completedAt?: string;
+    sourcePrice?: number;
+    destinationPrice?: number;
+    destinationProductId?: string;
+    error?: string | null;
+  },
+): string {
+  try {
+    const progress = currentProgress ? JSON.parse(currentProgress) : [];
+
+    // Ajouter le nouveau produit
+    progress.push(newProduct);
+
+    // Garder seulement les 50 derniers pour éviter un JSON trop gros
+    const MAX_PRODUCTS = 50;
+    if (progress.length > MAX_PRODUCTS) {
+      progress.splice(0, progress.length - MAX_PRODUCTS);
+    }
+
+    return JSON.stringify(progress);
+  } catch (error) {
+    console.error("Error updating product progress:", error);
+    return currentProgress || "[]";
+  }
+}
+
+/**
  * Traite un job de bulk import
  * Cette fonction s'exécute de manière asynchrone
  */
@@ -66,11 +103,30 @@ export async function processBulkImportJob(
     // Traiter chaque produit
     for (let i = 0; i < productData.length; i++) {
       const product = productData[i];
+      const startTime = new Date().toISOString();
 
       try {
         console.log(
           `[BulkImportWorker] Importing product ${i + 1}/${productData.length}: ${product.handle}`,
         );
+
+        // Marquer le produit comme "processing"
+        const processingProgress = addProductProgress(
+          job.recentProductProgress,
+          {
+            handle: product.handle,
+            title: product.handle, // On ne connaît pas encore le titre
+            status: "processing",
+            startedAt: startTime,
+          },
+        );
+
+        await prisma.bulkImportJob.update({
+          where: { id: jobId },
+          data: {
+            recentProductProgress: processingProgress,
+          },
+        });
 
         // Construire l'URL du produit avec le handle
         const productUrl = `https://${job.sourceShop}/products/${product.handle}.json`;
@@ -116,12 +172,31 @@ export async function processBulkImportJob(
             }
           }
 
+          // Mettre à jour le progress avec succès
+          const successProgress = addProductProgress(
+            job.recentProductProgress,
+            {
+              handle: product.handle,
+              title: sourceProduct.title,
+              status: "success",
+              startedAt: startTime,
+              completedAt: new Date().toISOString(),
+              sourcePrice: parseFloat(sourceProduct.variants[0]?.price || "0"),
+              destinationPrice: parseFloat(
+                result.product?.variants[0]?.price || "0",
+              ),
+              destinationProductId: result.product?.id,
+              error: null,
+            },
+          );
+
           // Incrémenter le compteur de succès
           await prisma.bulkImportJob.update({
             where: { id: jobId },
             data: {
               processedProducts: i + 1,
               successfulImports: { increment: 1 },
+              recentProductProgress: successProgress,
             },
           });
 
@@ -137,11 +212,27 @@ export async function processBulkImportJob(
           error,
         );
 
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+
         // Enregistrer l'erreur
         errors.push({
           productId: product.handle,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: errorMessage,
         });
+
+        // Mettre à jour le progress avec échec
+        const failedProgress = addProductProgress(
+          job.recentProductProgress,
+          {
+            handle: product.handle,
+            title: product.handle, // Fallback au handle si pas de titre
+            status: "failed",
+            startedAt: startTime,
+            completedAt: new Date().toISOString(),
+            error: errorMessage,
+          },
+        );
 
         // Incrémenter le compteur d'échecs
         await prisma.bulkImportJob.update({
@@ -149,6 +240,7 @@ export async function processBulkImportJob(
           data: {
             processedProducts: i + 1,
             failedImports: { increment: 1 },
+            recentProductProgress: failedProgress,
           },
         });
       }

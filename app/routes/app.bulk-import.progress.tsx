@@ -268,6 +268,142 @@ export default function BulkImportProgress() {
                 </div>
               </div>
 
+              {/* NOUVELLE SECTION: Liste des produits récents */}
+              {job.recentProducts && job.recentProducts.length > 0 && (
+                <div style={{ marginBottom: "20px" }}>
+                  <h3>Produits Récents ({job.recentProducts.length})</h3>
+                  <div
+                    style={{
+                      maxHeight: "400px",
+                      overflowY: "auto",
+                      border: "1px solid #ddd",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead
+                        style={{
+                          position: "sticky",
+                          top: 0,
+                          background: "#f9f9f9",
+                          borderBottom: "2px solid #ddd",
+                        }}
+                      >
+                        <tr>
+                          <th style={{ padding: "10px", textAlign: "left" }}>
+                            Produit
+                          </th>
+                          <th style={{ padding: "10px", textAlign: "left" }}>
+                            Statut
+                          </th>
+                          <th style={{ padding: "10px", textAlign: "left" }}>
+                            Prix
+                          </th>
+                          <th style={{ padding: "10px", textAlign: "left" }}>
+                            Timestamp
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {job.recentProducts
+                          .slice()
+                          .reverse() // Afficher les plus récents en premier
+                          .map((product: any, index: number) => (
+                            <tr
+                              key={index}
+                              style={{
+                                borderBottom: "1px solid #eee",
+                                background:
+                                  product.status === "success"
+                                    ? "#f0fdf4"
+                                    : product.status === "failed"
+                                      ? "#fef2f2"
+                                      : "#fef9e7",
+                              }}
+                            >
+                              <td style={{ padding: "10px" }}>
+                                <div>
+                                  <strong>{product.title || product.handle}</strong>
+                                </div>
+                                {product.error && (
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#dc2626",
+                                      marginTop: "4px",
+                                    }}
+                                  >
+                                    {product.error}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: "10px" }}>
+                                <span
+                                  style={{
+                                    padding: "4px 8px",
+                                    borderRadius: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    background:
+                                      product.status === "success"
+                                        ? "#22c55e"
+                                        : product.status === "failed"
+                                          ? "#ef4444"
+                                          : "#f59e0b",
+                                    color: "white",
+                                  }}
+                                >
+                                  {product.status === "success"
+                                    ? "✓ Succès"
+                                    : product.status === "failed"
+                                      ? "✗ Échec"
+                                      : "⏳ En cours"}
+                                </span>
+                              </td>
+                              <td style={{ padding: "10px" }}>
+                                {product.sourcePrice && product.destinationPrice ? (
+                                  <div>
+                                    <div style={{ fontSize: "12px", color: "#666" }}>
+                                      ${product.sourcePrice.toFixed(2)}
+                                    </div>
+                                    <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                                      → ${product.destinationPrice.toFixed(2)}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span style={{ color: "#999" }}>-</span>
+                                )}
+                              </td>
+                              <td style={{ padding: "10px", fontSize: "12px", color: "#666" }}>
+                                {product.completedAt
+                                  ? new Date(product.completedAt).toLocaleTimeString()
+                                  : product.startedAt
+                                    ? new Date(product.startedAt).toLocaleTimeString()
+                                    : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {job.recentProducts.length === 50 && (
+                    <div
+                      style={{
+                        padding: "10px",
+                        background: "#f0f9ff",
+                        borderRadius: "4px",
+                        marginTop: "10px",
+                        fontSize: "14px",
+                      }}
+                    >
+                      <strong>Note:</strong> Seuls les 50 produits les plus récents sont
+                      affichés.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {(job.jobStatus === "processing" ||
                 job.jobStatus === "pending") && (
                 <div
