@@ -78,6 +78,96 @@ export interface CreateProductResult {
 }
 
 /**
+ * Publie un produit dans le canal de vente Online Store
+ */
+async function publishToOnlineStore(admin: any, productId: string): Promise<void> {
+  console.log("=== PUBLISHING TO ONLINE STORE ===");
+  console.log("Product ID:", productId);
+
+  try {
+    // Récupérer l'ID du canal de vente Online Store
+    console.log("Fetching publications...");
+    const publicationsResponse = await admin.graphql(
+      `#graphql
+      query {
+        publications(first: 10) {
+          edges {
+            node {
+              id
+              name
+            }
+          }
+        }
+      }`
+    );
+
+    const publicationsJson = await publicationsResponse.json();
+    console.log("Publications response:", JSON.stringify(publicationsJson, null, 2));
+    const publications = publicationsJson.data?.publications?.edges || [];
+    console.log("Found", publications.length, "publications");
+
+    // Trouver le canal Online Store
+    const onlineStorePublication = publications.find(
+      (pub: any) => pub.node.name === "Online Store"
+    );
+
+    if (!onlineStorePublication) {
+      console.error("Online Store publication not found!");
+      console.log("Available publications:", publications.map((p: any) => p.node.name));
+      return;
+    }
+
+    console.log("Online Store publication found:", onlineStorePublication.node.id);
+
+    // Publier le produit dans le canal Online Store
+    console.log("Publishing product to Online Store...");
+    const publishResponse = await admin.graphql(
+      `#graphql
+      mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+        publishablePublish(id: $id, input: $input) {
+          publishable {
+            availablePublicationsCount {
+              count
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }`,
+      {
+        variables: {
+          id: productId,
+          input: [
+            {
+              publicationId: onlineStorePublication.node.id,
+            }
+          ],
+        },
+      }
+    );
+
+    const publishJson = await publishResponse.json();
+    console.log("Publish response:", JSON.stringify(publishJson, null, 2));
+
+    if (publishJson.data?.publishablePublish?.userErrors?.length > 0) {
+      const errors = publishJson.data.publishablePublish.userErrors
+        .map((e: any) => e.message)
+        .join(", ");
+      console.error("Publish errors:", errors);
+      throw new Error(`Failed to publish product: ${errors}`);
+    }
+
+    console.log("=== SUCCESSFULLY PUBLISHED TO ONLINE STORE ===");
+  } catch (error) {
+    console.error("=== ERROR IN publishToOnlineStore ===");
+    console.error("Error:", error);
+    throw error;
+  }
+}
+
+/**
  * Crée un produit Shopify à partir d'un produit source
  */
 export async function createShopifyProduct(
@@ -211,7 +301,7 @@ export async function createShopifyProduct(
         // Build option values for this variant
         const optionValues: Array<{ optionName: string; name: string }> = [];
 
-        variant.options.forEach((opt) => {
+        variant.options?.forEach((opt) => {
           optionValues.push({
             optionName: opt.name,
             name: opt.value,
@@ -389,6 +479,18 @@ export async function createShopifyProduct(
     const finalProductJson = await finalProductResponse.json();
     const finalProduct: ShopifyProduct = finalProductJson.data.product;
 
+    // ==========================================
+    // STEP 6: Publish to Online Store Channel
+    // ==========================================
+    console.log("Starting publication to Online Store...");
+    try {
+      await publishToOnlineStore(admin, finalProduct.id);
+      console.log("✓ Product published to Online Store");
+    } catch (publishError) {
+      console.error("✗ Error publishing to Online Store:", publishError);
+      // Ne pas faire échouer l'import si la publication échoue
+    }
+
     console.log("=== PRODUCT CREATION COMPLETE ===");
     console.log("Product ID:", finalProduct.id);
     console.log("Product Handle:", finalProduct.handle);
@@ -508,12 +610,10 @@ export async function isProductAlreadyImported(
   shop: string,
   sourceProductId: string,
 ): Promise<boolean> {
-  const existing = await prisma.importedProduct.findUnique({
+  const existing = await prisma.importedProduct.findFirst({
     where: {
-      shop_sourceProductId: {
-        shop,
-        sourceProductId,
-      },
+      shop,
+      sourceProductId,
     },
   });
 

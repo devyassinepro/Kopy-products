@@ -183,7 +183,7 @@ export async function processBulkImportJob(
               completedAt: new Date().toISOString(),
               sourcePrice: parseFloat(sourceProduct.variants[0]?.price || "0"),
               destinationPrice: parseFloat(
-                result.product?.variants[0]?.price || "0",
+                result.product?.variants?.edges?.[0]?.node?.price || "0",
               ),
               destinationProductId: result.product?.id,
               error: null,
